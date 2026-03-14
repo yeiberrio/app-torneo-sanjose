@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm install -g pnpm@9 && pnpm install && NEXT_OUTPUT=export pnpm --filter web exec next build",
+  "outputDirectory": "apps/web/out",
+  "framework": null,
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

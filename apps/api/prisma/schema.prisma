@@ -1,0 +1,443 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- ENUMS ----
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+enum DocumentType {
+  CEDULA_CIUDADANIA
+  CEDULA_EXTRANJERIA
+  PASAPORTE
+  TARJETA_IDENTIDAD
+  NIT
+}
+
+enum GeoRegion {
+  VALLE_ABURRA
+  ORIENTE_CERCANO
+}
+
+enum SectorType {
+  BARRIO
+  VEREDA
+  COMUNA
+  CORREGIMIENTO
+  URBANIZACION
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  ORGANIZER
+  REFEREE
+  SCOREKEEPER
+  DIRECTOR
+  PLAYER
+  OBSERVER
+  JOURNALIST
+  CITIZEN
+  BETTOR
+}
+
+enum UserStatus {
+  PENDING_EMAIL
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TournamentType {
+  LEAGUE
+  CUP
+  GROUPS
+  KNOCKOUT
+}
+
+enum TournamentStatus {
+  DRAFT
+  PUBLISHED
+  IN_PROGRESS
+  FINISHED
+  CANCELLED
+}
+
+enum PlayerPosition {
+  GOALKEEPER
+  DEFENDER
+  MIDFIELDER
+  FORWARD
+}
+
+enum PlayerStatus {
+  ACTIVE
+  SUSPENDED
+  INJURED
+  TRANSFERRED
+  INACTIVE
+}
+
+enum MatchStatus {
+  SCHEDULED
+  IN_PROGRESS
+  HALFTIME
+  FINISHED
+  SUSPENDED
+  CANCELLED
+  POSTPONED
+}
+
+enum EventType {
+  GOAL
+  OWN_GOAL
+  YELLOW_CARD
+  RED_CARD
+  YELLOW_RED_CARD
+  SUBSTITUTION_IN
+  SUBSTITUTION_OUT
+  FOUL
+  PENALTY_SCORED
+  PENALTY_MISSED
+}
+
+enum SanctionType {
+  YELLOW_ACCUMULATION
+  RED_CARD
+  CONDUCT
+  ADMINISTRATIVE
+}
+
+enum NewsStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum NewsCategory {
+  GENERAL
+  MATCH_RECAP
+  TRANSFER
+  INJURY
+  TOURNAMENT
+  ANNOUNCEMENT
+}
+
+// ---- MODELS ----
+
+model User {
+  id                  String       @id @default(cuid())
+  email               String       @unique
+  passwordHash        String
+  emailVerified       Boolean      @default(false)
+  emailVerifyToken    String?
+  emailVerifyExpires  DateTime?
+
+  firstName           String
+  lastName            String
+  phone               String?
+  gender              Gender?
+  avatarUrl           String?
+
+  documentType        DocumentType?
+  documentNumber      String?
+  documentPhotoUrl    String?
+  birthDate           DateTime?
+  nationality         String?      @default("Colombiana")
+
+  heightCm            Int?
+  weightKg            Float?
+
+  region              GeoRegion?
+  municipalityId      String?
+  municipality        Municipality? @relation(fields: [municipalityId], references: [id])
+  sectorId            String?
+  sector              GeoSector?   @relation(fields: [sectorId], references: [id])
+  address             String?
+
+  role                Role         @default(CITIZEN)
+  status              UserStatus   @default(PENDING_EMAIL)
+  roleJustification   String?
+
+  twoFactorEnabled    Boolean      @default(false)
+  twoFactorSecret     String?
+
+  registeredBy        String?
+  approvedBy          String?
+  approvedAt          DateTime?
+  lastLoginAt         DateTime?
+  passwordChangedAt   DateTime?
+  forcePasswordChange Boolean      @default(false)
+
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  sessions            Session[]
+  auditLogs           AuditLog[]
+  roleRequests        RoleRequest[]
+  playerProfile       Player?
+  refereeMatches      Match[]      @relation("MatchReferee")
+  news                News[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String   @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@map("sessions")
+}
+
+model RoleRequest {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestedRole Role
+  justification String?
+  status        RequestStatus @default(PENDING)
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@map("role_requests")
+}
+
+model Municipality {
+  id       String    @id @default(cuid())
+  name     String
+  region   GeoRegion
+  daneCode String?   @unique
+  users    User[]
+  sectors  GeoSector[]
+
+  @@map("municipalities")
+}
+
+model GeoSector {
+  id             String       @id @default(cuid())
+  municipalityId String
+  municipality   Municipality @relation(fields: [municipalityId], references: [id], onDelete: Cascade)
+  name           String
+  type           SectorType
+  users          User[]
+
+  @@unique([municipalityId, name])
+  @@map("geo_sectors")
+}
+
+model Tournament {
+  id               String           @id @default(cuid())
+  name             String
+  logoUrl          String?
+  organizerLogoUrl String?
+  organizerId      String
+  type             TournamentType
+  status           TournamentStatus @default(DRAFT)
+  startDate        DateTime
+  endDate          DateTime?
+  winPoints        Int              @default(3)
+  drawPoints       Int              @default(1)
+  lossPoints       Int              @default(0)
+  maxYellowCards   Int              @default(3)
+  createdAt        DateTime         @default(now())
+
+  teams            TournamentTeam[]
+  matches          Match[]
+  news             News[]
+
+  @@map("tournaments")
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  logoUrl     String?
+  city        String?
+  foundedYear Int?
+  directorId  String?
+  createdAt   DateTime @default(now())
+
+  players     Player[]
+  tournaments TournamentTeam[]
+
+  @@map("teams")
+}
+
+model TournamentTeam {
+  id           String     @id @default(cuid())
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamId       String
+  team         Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  groupName    String?
+
+  @@unique([tournamentId, teamId])
+  @@map("tournament_teams")
+}
+
+model Player {
+  id               String          @id @default(cuid())
+  userId           String?         @unique
+  user             User?           @relation(fields: [userId], references: [id])
+  teamId           String
+  team             Team            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  firstName        String
+  lastName         String
+  photoUrl         String?
+  jerseyNumber     Int?
+  position         PlayerPosition?
+  birthDate        DateTime?
+  documentType     DocumentType?
+  documentNumber   String?
+  documentPhotoUrl String?
+  heightCm         Int?
+  weightKg         Float?
+  gender           Gender?
+  nationality      String?
+  municipalityId   String?
+  sectorId         String?
+  status           PlayerStatus    @default(ACTIVE)
+  createdAt        DateTime        @default(now())
+
+  stats            MatchPlayerStat[]
+  sanctions        Sanction[]
+  events           MatchEvent[]
+
+  @@map("players")
+}
+
+model Match {
+  id             String      @id @default(cuid())
+  tournamentId   String
+  tournament     Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  teamAId        String
+  teamBId        String
+  scheduledAt    DateTime
+  venue          String?
+  matchNumber    Int?
+  dayNumber      Int?
+  status         MatchStatus @default(SCHEDULED)
+  scoreA         Int?
+  scoreB         Int?
+  refereeId      String?
+  referee        User?       @relation("MatchReferee", fields: [refereeId], references: [id])
+  scorekeeperId  String?
+  observerId     String?
+  refereeReport  String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  events         MatchEvent[]
+  playerStats    MatchPlayerStat[]
+
+  @@map("matches")
+}
+
+model MatchEvent {
+  id          String    @id @default(cuid())
+  matchId     String
+  match       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  playerId    String?
+  player      Player?   @relation(fields: [playerId], references: [id])
+  teamId      String
+  type        EventType
+  minute      Int?
+  description String?
+  createdAt   DateTime  @default(now())
+  createdBy   String
+
+  @@map("match_events")
+}
+
+model MatchPlayerStat {
+  id            String @id @default(cuid())
+  matchId       String
+  playerId      String
+  goals         Int    @default(0)
+  ownGoals      Int    @default(0)
+  assists       Int    @default(0)
+  yellowCards   Int    @default(0)
+  redCards      Int    @default(0)
+  fouls         Int    @default(0)
+  minutesPlayed Int?
+  match         Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player        Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@map("match_player_stats")
+}
+
+model Sanction {
+  id            String       @id @default(cuid())
+  playerId      String
+  player        Player       @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  tournamentId  String
+  type          SanctionType
+  matchesBanned Int          @default(1)
+  reason        String?
+  isActive      Boolean      @default(true)
+  imposedBy     String
+  imposedAt     DateTime     @default(now())
+
+  @@map("sanctions")
+}
+
+model News {
+  id            String        @id @default(cuid())
+  title         String
+  summary       String?
+  content       String
+  imageUrl      String?
+  category      NewsCategory  @default(GENERAL)
+  status        NewsStatus    @default(DRAFT)
+  tournamentId  String?
+  tournament    Tournament?   @relation(fields: [tournamentId], references: [id])
+  authorId      String
+  author        User          @relation(fields: [authorId], references: [id])
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("news")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}

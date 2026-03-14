@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: sportmanager-db
+    restart: unless-stopped
+    ports:
+      - "5450:5432"
+    environment:
+      POSTGRES_USER: sportmanager
+      POSTGRES_PASSWORD: sportmanager2026
+      POSTGRES_DB: sportmanager
+    volumes:
+      - sportmanager_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: sportmanager-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - sportmanager_redis:/data
+
+volumes:
+  sportmanager_pgdata:
+  sportmanager_redis:

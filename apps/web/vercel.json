@@ -1,0 +1,6 @@
+{
+  "framework": "nextjs",
+  "installCommand": "cd ../.. && npm install -g pnpm@9 && pnpm install",
+  "buildCommand": "cd ../.. && pnpm --filter web exec next build",
+  "outputDirectory": ".next"
+}

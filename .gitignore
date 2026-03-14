@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.next/
+.turbo/
+*.env
+!*.env.example
+.DS_Store
+*.tsbuildinfo
+android/
+ios/
+*.apk
+*.ipa
+.vercel
+.railway
