@@ -15,7 +15,7 @@ RUN cd apps/api && npx tsc prisma/seed.ts --outDir dist/seed --module commonjs -
 
 FROM node:18-alpine AS runner
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl && npm install -g pnpm@9
 
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
