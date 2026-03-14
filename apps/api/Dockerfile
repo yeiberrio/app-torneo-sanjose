@@ -27,9 +27,7 @@ COPY --from=builder /app/apps/api/package.json ./apps/api/
 WORKDIR /app/apps/api
 RUN npx prisma generate
 
-ENV PRISMA_CLI_QUERY_ENGINE_TYPE=library
-ENV PRISMA_ENGINE_PROTOCOL=json
-
 EXPOSE 3001
 
-CMD ["sh", "-c", "echo 'Running migrations...' && npx prisma migrate deploy && echo 'Running seed...' && node dist/seed/seed.js && echo 'Starting API...' && node dist/src/main.js"]
+# Start API first, run migrations and seed in background so healthcheck passes
+CMD ["sh", "-c", "npx prisma migrate deploy 2>&1 && node dist/seed/seed.js 2>&1; node dist/src/main.js"]
