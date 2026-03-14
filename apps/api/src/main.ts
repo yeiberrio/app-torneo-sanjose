@@ -7,8 +7,6 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.use(helmet());
-
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',')
     : ['http://localhost:3000', 'http://localhost:3001', 'https://app-torneo-sanjose.vercel.app'];
@@ -17,6 +15,10 @@ async function bootstrap() {
     origin: allowedOrigins,
     credentials: true,
   });
+
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
 
   app.useGlobalPipes(
     new ValidationPipe({
