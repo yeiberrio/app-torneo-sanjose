@@ -15,7 +15,7 @@ RUN cd apps/api && npx tsc prisma/seed.ts --outDir dist/seed --module commonjs -
 
 FROM node:18-alpine AS runner
 
-RUN apk add --no-cache openssl && npm install -g pnpm@9
+RUN apk add --no-cache openssl libssl3 && npm install -g pnpm@9
 
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
@@ -27,6 +27,9 @@ COPY --from=builder /app/apps/api/package.json ./apps/api/
 WORKDIR /app/apps/api
 RUN npx prisma generate
 
+ENV PRISMA_CLI_QUERY_ENGINE_TYPE=library
+ENV PRISMA_ENGINE_PROTOCOL=json
+
 EXPOSE 3001
 
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/seed/seed.js && node dist/src/main.js"]
+CMD ["sh", "-c", "echo 'Running migrations...' && npx prisma migrate deploy && echo 'Running seed...' && node dist/seed/seed.js && echo 'Starting API...' && node dist/src/main.js"]
