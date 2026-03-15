@@ -1165,33 +1165,94 @@ SEED_SUPER_ADMIN_PASSWORD="ChangeMe123!@#"
 | Redis (Docker) | Operativo | Puerto 6380, container: sportmanager-redis |
 | Prisma Schema | Completo | 16 modelos, 14 enums, seed con datos demo |
 | Frontend (Vercel) | Desplegado | https://app-torneo-sanjose.vercel.app |
-| Backend (Railway) | Pendiente | Requiere `railway login` + deploy |
+| Backend (Railway) | Online | https://api-production-3e93.up.railway.app |
+| Swagger API Docs | Disponible | https://api-production-3e93.up.railway.app/api/docs |
+| PostgreSQL (Railway) | Online | Servicio en Railway, conectado via DATABASE_URL |
 | Monorepo | Configurado | pnpm + Turborepo |
-| Swagger API Docs | Disponible | http://localhost:3001/api/docs |
+| railway.toml | Configurado | dockerfilePath = apps/api/Dockerfile |
 
 ### Datos Demo (Seed)
-- Super Admin: admin@sportmanager.com / Admin2026*
+- Super Admin en produccion: admin@sanjose.com / admin2026
+- Super Admin local: admin@sportmanager.com / Admin2026*
 - Torneo: "Torneo San Jose 2026" (IN_PROGRESS)
 - 8 equipos de Guarne, 88 jugadores, 28 partidos (16 finalizados)
 - 63 eventos (goles + tarjetas), standings y goleadores calculados
-- Municipios: 10 Valle de Aburrá + 17 Oriente Cercano
+- Municipios: 10 Valle de Aburra + 17 Oriente Cercano
 - Sectores Guarne: 17 barrios + 32 veredas
 
 ### Credenciales
-- **Super Admin:** admin@sportmanager.com / Admin2026*
+- **Super Admin produccion:** admin@sanjose.com / admin2026
+- **Super Admin local:** admin@sportmanager.com / Admin2026*
 - **BD Local:** postgresql://sportmanager:sportmanager2026@localhost:5450/sportmanager
 
+### Variables de entorno configuradas
+
+#### Railway (API)
+| Variable | Valor |
+|---|---|
+| DATABASE_URL | ${{Postgres.DATABASE_URL}} (referencia al servicio PostgreSQL) |
+| NODE_ENV | production |
+| PORT | 3001 |
+| JWT_ACCESS_SECRET | (secreto generado) |
+| JWT_REFRESH_SECRET | (secreto generado) |
+| JWT_ACCESS_EXPIRES | 15m |
+| JWT_REFRESH_EXPIRES | 7d |
+| SEED_SUPER_ADMIN_EMAIL | admin@sanjose.com |
+| SEED_SUPER_ADMIN_PASSWORD | admin2026 |
+| CORS_ORIGINS | No usar — CORS configurado con origin:true en main.ts |
+
+#### Vercel (Web)
+| Variable | Valor |
+|---|---|
+| NEXT_PUBLIC_API_URL | https://api-production-3e93.up.railway.app |
+
 ---
 
-## 16. CONSIDERACIONES ADICIONALES
+## 16. ESTADO DEL DEPLOY (Actualizado: 2026-03-15)
 
-- **Accesibilidad:** cumplir WCAG 2.1 nivel AA (contraste, navegación por teclado, ARIA)
-- **Performance:** lazy loading de módulos, paginación en todas las listas, caché Redis para estadísticas calculadas
-- **Internacionalización:** interfaz en Español (principal) e Inglés
-- **Backups:** backup automático diario de PostgreSQL en Railway (retención 30 días)
+### Deploy completado - Login funcional
+- [x] Proyecto creado en Railway
+- [x] Servicio PostgreSQL agregado en Railway (online)
+- [x] Servicio API conectado al repo de GitHub (deploy automatico)
+- [x] Variables de entorno configuradas en Railway
+- [x] railway.toml creado con configuracion de Docker
+- [x] Dockerfile corregido: ruta dist/src/main.js, pnpm en runner, seed compilado
+- [x] API online y respondiendo en https://api-production-3e93.up.railway.app
+- [x] Swagger disponible en https://api-production-3e93.up.railway.app/api/docs
+- [x] Seed ejecutado correctamente (admin@sanjose.com creado)
+- [x] Frontend desplegado en Vercel con NEXT_PUBLIC_API_URL configurada
+- [x] Variable NEXT_PUBLIC_API_URL incrustada en JS del frontend (verificado)
+- [x] CORS resuelto: configurado con origin:true en main.ts, helmet con crossOriginResourcePolicy
+- [x] **Login funcional desde https://app-torneo-sanjose.vercel.app/login** (verificado 2026-03-15)
+
+### Problemas resueltos durante el deploy
+1. **Dockerfile - ruta incorrecta:** NestJS compila a `dist/src/main.js`, no `dist/main.js`. Script start corregido.
+2. **Dockerfile - pnpm faltante en runner:** Railway ejecuta `pnpm start`, requiere pnpm instalado en el stage runner.
+3. **Dockerfile - seed no se ejecutaba:** Seed compilado a JS con tsc y ejecutado automaticamente al iniciar el contenedor.
+4. **CORS bloqueaba el login:** helmet() interferida con los headers CORS. Solucion: CORS configurado a nivel de NestFactory.create con `origin: true`, helmet aplicado despues con `crossOriginResourcePolicy: 'cross-origin'`.
+5. **Frontend apuntaba a localhost:** .env.production actualizado a URL de Railway. Variable tambien configurada en Vercel dashboard.
+
+### PENDIENTE - Restringir CORS
+- Actualmente CORS esta con `origin: true` (permite cualquier origin). Se debe restringir a los dominios permitidos una vez estabilizado el deploy. Eliminar la variable CORS_ORIGINS de Railway y usar la lista hardcodeada en main.ts, o configurar CORS_ORIGINS correctamente (sin espacios, sin barra final).
+
+### Cambios realizados en el codigo (commits del 2026-03-14 y 2026-03-15)
+- `railway.toml` creado en la raiz del proyecto
+- `apps/api/Dockerfile`: corregido para compilar seed, instalar pnpm en runner, ruta correcta a main.js
+- `apps/api/package.json`: script start corregido a `dist/src/main.js`, incluye migraciones y seed
+- `apps/api/src/main.ts`: CORS configurado en NestFactory.create con origin:true, helmet despues con crossOriginResourcePolicy
+- `apps/web/.env.production`: actualizado a https://api-production-3e93.up.railway.app
+
+---
+
+## 17. CONSIDERACIONES ADICIONALES
+
+- **Accesibilidad:** cumplir WCAG 2.1 nivel AA (contraste, navegacion por teclado, ARIA)
+- **Performance:** lazy loading de modulos, paginacion en todas las listas, cache Redis para estadisticas calculadas
+- **Internacionalizacion:** interfaz en Espanol (principal) e Ingles
+- **Backups:** backup automatico diario de PostgreSQL en Railway (retencion 30 dias)
 - **Monitoreo:** Railway metrics + Logtail para logs centralizados
-- **Legal:** términos y condiciones + política de privacidad obligatorios en registro, especialmente para módulo de apuestas
+- **Legal:** terminos y condiciones + politica de privacidad obligatorios en registro, especialmente para modulo de apuestas
 
 ---
 
-*Documento generado para desarrollo enterprise. Versión 1.1 — SportManager Pro — Actualizado: 2026-03-06*
+*Documento generado para desarrollo enterprise. Version 1.3 — SportManager Pro — Actualizado: 2026-03-15*

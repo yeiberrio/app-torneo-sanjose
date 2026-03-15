@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Clock, CircleDot, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, Plus, Clock, CircleDot, Wifi, WifiOff, CalendarClock, Edit } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -39,10 +39,12 @@ const eventTypeLabels: Record<string, { label: string; icon: string }> = {
 };
 
 const statusFlow: Record<string, string[]> = {
-  SCHEDULED: ["IN_PROGRESS"],
+  SCHEDULED: ["IN_PROGRESS", "POSTPONED", "CANCELLED"],
   IN_PROGRESS: ["HALFTIME", "FINISHED", "SUSPENDED"],
   HALFTIME: ["IN_PROGRESS"],
-  SUSPENDED: ["IN_PROGRESS", "CANCELLED"],
+  SUSPENDED: ["IN_PROGRESS", "CANCELLED", "POSTPONED"],
+  POSTPONED: ["SCHEDULED"],
+  CANCELLED: ["SCHEDULED"],
 };
 
 export default function MatchDetailPage() {
@@ -63,6 +65,11 @@ export default function MatchDetailPage() {
     description: "",
   });
   const [wsConnected, setWsConnected] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleForm, setRescheduleForm] = useState({
+    scheduledAt: "",
+    venue: "",
+  });
   const socketRef = useRef<Socket | null>(null);
 
   // WebSocket connection for real-time updates
@@ -157,6 +164,24 @@ export default function MatchDetailPage() {
     }
   };
 
+  const handleReschedule = async () => {
+    try {
+      const payload: any = {};
+      if (rescheduleForm.scheduledAt) payload.scheduledAt = rescheduleForm.scheduledAt;
+      if (rescheduleForm.venue) payload.venue = rescheduleForm.venue;
+      if (match.status === "POSTPONED" || match.status === "CANCELLED") {
+        payload.status = "SCHEDULED";
+      }
+      await api.patch(`/matches/${matchId}`, payload);
+      toast.success("Partido reprogramado exitosamente");
+      setRescheduleOpen(false);
+      setRescheduleForm({ scheduledAt: "", venue: "" });
+      fetchMatch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al reprogramar partido");
+    }
+  };
+
   const selectedTeamPlayers = eventForm.teamId === match?.teamAId ? playersA : eventForm.teamId === match?.teamBId ? playersB : [];
 
   if (loading) return <p className="text-muted-foreground p-6">Cargando partido...</p>;
@@ -224,15 +249,50 @@ export default function MatchDetailPage() {
           </div>
 
           {/* Status actions */}
-          {nextStatuses.length > 0 && (
-            <div className="flex justify-center gap-2 mt-4">
-              {nextStatuses.map((s) => (
-                <Button key={s} size="sm" variant={s === "FINISHED" ? "default" : "outline"} onClick={() => handleStatusChange(s)}>
-                  {statusLabels[s]?.label || s}
+          <div className="flex justify-center gap-2 mt-4 flex-wrap">
+            {nextStatuses.map((s) => (
+              <Button key={s} size="sm"
+                variant={s === "FINISHED" ? "default" : s === "CANCELLED" ? "destructive" : "outline"}
+                onClick={() => handleStatusChange(s)}
+              >
+                {statusLabels[s]?.label || s}
+              </Button>
+            ))}
+            <Dialog open={rescheduleOpen} onOpenChange={setRescheduleOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <CalendarClock className="h-4 w-4 mr-2" />Reprogramar
                 </Button>
-              ))}
-            </div>
-          )}
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Reprogramar Partido</DialogTitle>
+                  <DialogDescription>Cambia la fecha, hora o sede del partido.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Nueva fecha y hora</Label>
+                    <Input
+                      type="datetime-local"
+                      value={rescheduleForm.scheduledAt}
+                      onChange={(e) => setRescheduleForm(prev => ({ ...prev, scheduledAt: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Sede</Label>
+                    <Input
+                      value={rescheduleForm.venue}
+                      onChange={(e) => setRescheduleForm(prev => ({ ...prev, venue: e.target.value }))}
+                      placeholder={match.venue || "Sede del partido"}
+                    />
+                  </div>
+                  <Button onClick={handleReschedule} className="w-full">
+                    Reprogramar Partido
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardContent>
       </Card>
 

@@ -26,7 +26,12 @@ export class TeamsService {
   async findById(id: string) {
     const team = await this.prisma.team.findUnique({
       where: { id },
-      include: { players: { where: { status: 'ACTIVE' }, orderBy: { jerseyNumber: 'asc' } } },
+      include: {
+        players: { orderBy: { jerseyNumber: 'asc' } },
+        tournaments: {
+          include: { tournament: { select: { id: true, name: true, type: true, status: true } } },
+        },
+      },
     });
     if (!team) throw new NotFoundException('Equipo no encontrado');
     return team;

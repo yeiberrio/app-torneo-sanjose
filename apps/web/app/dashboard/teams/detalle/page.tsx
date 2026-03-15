@@ -1,0 +1,276 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, Users, Trophy, MapPin, Calendar } from "lucide-react";
+import api from "@/lib/api";
+import Link from "next/link";
+
+interface Player {
+  id: string;
+  firstName: string;
+  lastName: string;
+  jerseyNumber: number | null;
+  position: string;
+  status: string;
+  nationality: string | null;
+}
+
+interface Tournament {
+  tournament: {
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+  };
+  groupName?: string;
+}
+
+interface Team {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+  city: string | null;
+  foundedYear: number | null;
+  players: Player[];
+  tournaments: Tournament[];
+}
+
+const positionLabels: Record<string, string> = {
+  GOALKEEPER: "Portero",
+  DEFENDER: "Defensa",
+  MIDFIELDER: "Mediocampista",
+  FORWARD: "Delantero",
+};
+
+const positionOrder: Record<string, number> = {
+  GOALKEEPER: 0,
+  DEFENDER: 1,
+  MIDFIELDER: 2,
+  FORWARD: 3,
+};
+
+const statusLabels: Record<string, string> = {
+  ACTIVE: "Activo",
+  INJURED: "Lesionado",
+  SUSPENDED: "Suspendido",
+  INACTIVE: "Inactivo",
+};
+
+const statusColors: Record<string, string> = {
+  ACTIVE: "bg-green-100 text-green-800",
+  INJURED: "bg-red-100 text-red-800",
+  SUSPENDED: "bg-yellow-100 text-yellow-800",
+  INACTIVE: "bg-gray-100 text-gray-800",
+};
+
+const tournamentStatusLabels: Record<string, string> = {
+  DRAFT: "Borrador",
+  PUBLISHED: "Publicado",
+  IN_PROGRESS: "En curso",
+  FINISHED: "Finalizado",
+  CANCELLED: "Cancelado",
+};
+
+const tournamentStatusColors: Record<string, string> = {
+  DRAFT: "bg-gray-100 text-gray-800",
+  PUBLISHED: "bg-blue-100 text-blue-800",
+  IN_PROGRESS: "bg-green-100 text-green-800",
+  FINISHED: "bg-purple-100 text-purple-800",
+  CANCELLED: "bg-red-100 text-red-800",
+};
+
+export default function TeamDetailPage() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+  const [team, setTeam] = useState<Team | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    api
+      .get(`/teams/${id}`)
+      .then((res) => setTeam(res.data))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return <p className="text-muted-foreground">Cargando...</p>;
+  }
+
+  if (!team) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Equipo no encontrado.</p>
+        <Button asChild variant="outline" className="mt-4">
+          <Link href="/dashboard/teams">Volver a equipos</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  const sortedPlayers = [...team.players].sort((a, b) => {
+    const posA = positionOrder[a.position] ?? 99;
+    const posB = positionOrder[b.position] ?? 99;
+    if (posA !== posB) return posA - posB;
+    return (a.jerseyNumber ?? 99) - (b.jerseyNumber ?? 99);
+  });
+
+  const playersByPosition = sortedPlayers.reduce<Record<string, Player[]>>((acc, p) => {
+    const pos = p.position || "OTHER";
+    if (!acc[pos]) acc[pos] = [];
+    acc[pos].push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      <Button asChild variant="ghost" className="mb-4">
+        <Link href="/dashboard/teams">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Volver
+        </Link>
+      </Button>
+
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xl">
+          {team.name.substring(0, 2).toUpperCase()}
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">{team.name}</h1>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            {team.city && (
+              <span className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {team.city}
+              </span>
+            )}
+            {team.foundedYear && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Fundado en {team.foundedYear}
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Users className="h-3 w-3" />
+              {team.players.length} jugadores
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Jugadores */}
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Plantilla ({team.players.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {team.players.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  No hay jugadores registrados.
+                </p>
+              ) : (
+                <div className="space-y-6">
+                  {Object.entries(playersByPosition).map(([position, players]) => (
+                    <div key={position}>
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-2">
+                        {positionLabels[position] || position} ({players.length})
+                      </h3>
+                      <div className="space-y-1">
+                        {players.map((player) => (
+                          <div
+                            key={player.id}
+                            className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50"
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                {player.jerseyNumber ?? "-"}
+                              </span>
+                              <div>
+                                <p className="font-medium text-sm">
+                                  {player.firstName} {player.lastName}
+                                </p>
+                                {player.nationality && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {player.nationality}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className={statusColors[player.status] || ""}
+                            >
+                              {statusLabels[player.status] || player.status}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Torneos */}
+        <div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5" />
+                Torneos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!team.tournaments || team.tournaments.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  No participa en torneos.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {team.tournaments.map((tt) => (
+                    <Link
+                      key={tt.tournament.id}
+                      href={`/dashboard/tournaments/detalle?id=${tt.tournament.id}`}
+                      className="block"
+                    >
+                      <div className="p-3 rounded-md border hover:bg-muted/50 transition-colors">
+                        <p className="font-medium text-sm">{tt.tournament.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge
+                            variant="secondary"
+                            className={
+                              tournamentStatusColors[tt.tournament.status] || ""
+                            }
+                          >
+                            {tournamentStatusLabels[tt.tournament.status] ||
+                              tt.tournament.status}
+                          </Badge>
+                          {tt.groupName && (
+                            <Badge variant="outline">Grupo {tt.groupName}</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

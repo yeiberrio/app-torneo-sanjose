@@ -40,19 +40,21 @@ export default function TeamsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {teams.map((team) => (
-            <Card key={team.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    {team.name.substring(0, 2).toUpperCase()}
+            <Link key={team.id} href={`/dashboard/teams/detalle?id=${team.id}`}>
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                      {team.name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-semibold">{team.name}</p>
+                      <p className="text-sm text-muted-foreground">{team.city || "Sin ciudad"} | {team._count?.players || 0} jugadores</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold">{team.name}</p>
-                    <p className="text-sm text-muted-foreground">{team.city || "Sin ciudad"} | {team._count?.players || 0} jugadores</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

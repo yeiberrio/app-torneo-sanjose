@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { TournamentsService } from './tournaments.service';
 import { CreateTournamentDto } from './dto/create-tournament.dto';
 import { UpdateTournamentDto } from './dto/update-tournament.dto';
+import { GenerateFixtureDto } from './dto/generate-fixture.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PoliciesGuard, CheckPolicies } from '../casl/policies.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -64,5 +65,23 @@ export class TournamentsController {
   @ApiOperation({ summary: 'Remover equipo del torneo' })
   removeTeam(@Param('id') id: string, @Param('teamId') teamId: string) {
     return this.tournamentsService.removeTeam(id, teamId);
+  }
+
+  @Post(':id/generate-fixture')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Generar fixture automaticamente' })
+  generateFixture(@Param('id') id: string, @Body() dto: GenerateFixtureDto) {
+    return this.tournamentsService.generateFixture(id, dto);
+  }
+
+  @Delete(':id/fixture')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Eliminar fixture (solo partidos no jugados)' })
+  deleteFixture(@Param('id') id: string) {
+    return this.tournamentsService.deleteFixture(id);
   }
 }

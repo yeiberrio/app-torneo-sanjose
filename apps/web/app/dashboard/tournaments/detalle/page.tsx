@@ -8,7 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Trophy, Users, Swords, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -19,8 +21,12 @@ const statusLabels: Record<string, { label: string; className: string }> = {
   DRAFT: { label: "Borrador", className: "bg-yellow-100 text-yellow-800" },
   PUBLISHED: { label: "Publicado", className: "bg-blue-100 text-blue-800" },
   IN_PROGRESS: { label: "En curso", className: "bg-green-100 text-green-800" },
+  HALFTIME: { label: "Entretiempo", className: "bg-orange-100 text-orange-800" },
   FINISHED: { label: "Finalizado", className: "bg-gray-100 text-gray-800" },
   CANCELLED: { label: "Cancelado", className: "bg-red-100 text-red-800" },
+  POSTPONED: { label: "Aplazado", className: "bg-purple-100 text-purple-800" },
+  SUSPENDED: { label: "Suspendido", className: "bg-red-100 text-red-800" },
+  SCHEDULED: { label: "Programado", className: "bg-blue-100 text-blue-800" },
 };
 
 const typeLabels: Record<string, string> = {
@@ -40,6 +46,15 @@ export default function TournamentDetailPage() {
   const [allTeams, setAllTeams] = useState<any[]>([]);
   const [addTeamId, setAddTeamId] = useState("");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [fixtureDialogOpen, setFixtureDialogOpen] = useState(false);
+  const [fixtureLoading, setFixtureLoading] = useState(false);
+  const [fixtureConfig, setFixtureConfig] = useState({
+    legs: "1",
+    intervalDays: "7",
+    matchTime: "15:00",
+    startDate: "",
+    defaultVenue: "",
+  });
   const [loading, setLoading] = useState(true);
 
   const fetchTournament = () => {
@@ -74,6 +89,37 @@ export default function TournamentDetailPage() {
       fetchTournament();
     } catch {
       toast.error("Error al remover equipo");
+    }
+  };
+
+  const handleGenerateFixture = async () => {
+    setFixtureLoading(true);
+    try {
+      const res = await api.post(`/tournaments/${tournamentId}/generate-fixture`, {
+        legs: Number(fixtureConfig.legs),
+        intervalDays: Number(fixtureConfig.intervalDays),
+        matchTime: fixtureConfig.matchTime,
+        startDate: fixtureConfig.startDate || undefined,
+        defaultVenue: fixtureConfig.defaultVenue || undefined,
+      });
+      toast.success(res.data.message || "Fixture generado exitosamente");
+      setFixtureDialogOpen(false);
+      fetchTournament();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al generar fixture");
+    } finally {
+      setFixtureLoading(false);
+    }
+  };
+
+  const handleDeleteFixture = async () => {
+    if (!confirm("¿Eliminar todos los partidos no jugados? Esta accion no se puede deshacer.")) return;
+    try {
+      const res = await api.delete(`/tournaments/${tournamentId}/fixture`);
+      toast.success(res.data.message || "Fixture eliminado");
+      fetchTournament();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al eliminar fixture");
     }
   };
 
@@ -226,9 +272,88 @@ export default function TournamentDetailPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Partidos</CardTitle>
               {canManage && (
-                <Button size="sm" asChild>
-                  <Link href={`/dashboard/matches/new`}><Plus className="h-4 w-4 mr-2" />Programar</Link>
-                </Button>
+                <div className="flex gap-2">
+                  {tournament.teams?.length >= 2 && (
+                    <Dialog open={fixtureDialogOpen} onOpenChange={setFixtureDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline">
+                          <Calendar className="h-4 w-4 mr-2" />Generar Fixture
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Generar Fixture</DialogTitle>
+                          <DialogDescription>
+                            Configura las opciones para generar el fixture automaticamente.
+                            Tipo: {typeLabels[tournament.type] || tournament.type} | {tournament.teams?.length || 0} equipos
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          {(tournament.type === "LEAGUE" || tournament.type === "GROUPS") && (
+                            <div className="space-y-2">
+                              <Label>Modalidad</Label>
+                              <Select value={fixtureConfig.legs} onValueChange={(v) => setFixtureConfig(prev => ({ ...prev, legs: v }))}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">Solo ida</SelectItem>
+                                  <SelectItem value="2">Ida y vuelta</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <Label>Fecha de inicio</Label>
+                            <Input
+                              type="date"
+                              value={fixtureConfig.startDate}
+                              onChange={(e) => setFixtureConfig(prev => ({ ...prev, startDate: e.target.value }))}
+                              placeholder="Usa la fecha del torneo si no se especifica"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Dias entre jornadas</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={30}
+                                value={fixtureConfig.intervalDays}
+                                onChange={(e) => setFixtureConfig(prev => ({ ...prev, intervalDays: e.target.value }))}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Hora de partidos</Label>
+                              <Input
+                                type="time"
+                                value={fixtureConfig.matchTime}
+                                onChange={(e) => setFixtureConfig(prev => ({ ...prev, matchTime: e.target.value }))}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Sede por defecto (opcional)</Label>
+                            <Input
+                              value={fixtureConfig.defaultVenue}
+                              onChange={(e) => setFixtureConfig(prev => ({ ...prev, defaultVenue: e.target.value }))}
+                              placeholder="Ej: Cancha Municipal"
+                            />
+                          </div>
+                          <Button onClick={handleGenerateFixture} disabled={fixtureLoading} className="w-full">
+                            {fixtureLoading ? "Generando..." : "Generar Fixture"}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  {tournament.matches?.length > 0 && (
+                    <Button size="sm" variant="destructive" onClick={handleDeleteFixture}>
+                      <Trash2 className="h-4 w-4 mr-2" />Eliminar Fixture
+                    </Button>
+                  )}
+                  <Button size="sm" asChild>
+                    <Link href={`/dashboard/matches/new`}><Plus className="h-4 w-4 mr-2" />Manual</Link>
+                  </Button>
+                </div>
               )}
             </CardHeader>
             <CardContent>
