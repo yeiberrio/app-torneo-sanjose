@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Users } from "lucide-react";
+import { Plus, Users, ChevronRight } from "lucide-react";
 import api from "@/lib/api";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/auth-store";
 import { can } from "@/lib/permissions";
 
@@ -14,7 +13,6 @@ export default function TeamsPage() {
   const { user } = useAuthStore();
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
   const canCreate = user ? can(user.role, 'create', 'Team') : false;
 
   useEffect(() => {
@@ -42,19 +40,22 @@ export default function TeamsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {teams.map((team) => (
-            <Card key={team.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push(`/dashboard/teams/detalle?id=${team.id}`)}>
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    {team.name.substring(0, 2).toUpperCase()}
+            <a key={team.id} href={`/dashboard/teams/detalle?id=${team.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                      {team.name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-semibold">{team.name}</p>
+                      <p className="text-sm text-muted-foreground">{team.city || "Sin ciudad"} | {team._count?.players || 0} jugadores</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <div>
-                    <p className="font-semibold">{team.name}</p>
-                    <p className="text-sm text-muted-foreground">{team.city || "Sin ciudad"} | {team._count?.players || 0} jugadores</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </a>
           ))}
         </div>
       )}
