@@ -86,22 +86,18 @@ export class MatchesService {
   }
 
   async addEvent(matchId: string, dto: CreateMatchEventDto, userId: string) {
-    // Clean empty playerId to avoid FK violation
-    if (dto.playerId === '') {
-      dto.playerId = undefined;
-    }
+    // Clean empty/falsy playerId to avoid FK violation
+    const playerId = dto.playerId && dto.playerId.trim() !== '' ? dto.playerId : undefined;
 
     // Check if player is blocked by active sanctions
-    if (dto.playerId) {
+    if (playerId) {
       const matchData = await this.prisma.match.findUnique({
         where: { id: matchId },
         select: { tournamentId: true, teamAId: true, teamBId: true, scoreA: true, scoreB: true },
       });
       if (matchData) {
-        const playerSanctions = await this.sanctionsService.getActiveSanctions(dto.playerId, matchData.tournamentId);
+        const playerSanctions = await this.sanctionsService.getActiveSanctions(playerId, matchData.tournamentId);
         if (playerSanctions.length > 0) {
-          // Allow card events even for blocked players (they might get a card during the match before being detected)
-          // But block goal/assist events
           if (['GOAL', 'PENALTY_SCORED', 'SUBSTITUTION_IN'].includes(dto.type)) {
             const reasons = playerSanctions.map(s => s.reason).join('; ');
             throw new BadRequestException(
@@ -112,9 +108,18 @@ export class MatchesService {
       }
     }
 
-    const event = await this.prisma.matchEvent.create({
-      data: { ...dto, matchId, createdBy: userId },
-    });
+    // Build data explicitly to avoid sending unknown fields to Prisma
+    const eventData: any = {
+      matchId,
+      teamId: dto.teamId,
+      type: dto.type,
+      createdBy: userId,
+    };
+    if (playerId) eventData.playerId = playerId;
+    if (dto.minute !== undefined && dto.minute !== null) eventData.minute = Number(dto.minute);
+    if (dto.description) eventData.description = dto.description;
+
+    const event = await this.prisma.matchEvent.create({ data: eventData });
 
     // Update match score if it's a goal
     if (['GOAL', 'PENALTY_SCORED'].includes(dto.type)) {
