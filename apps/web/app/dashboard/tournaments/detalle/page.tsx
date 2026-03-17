@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2, ListOrdered, Settings2, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -36,6 +36,28 @@ const typeLabels: Record<string, string> = {
   KNOCKOUT: "Eliminacion directa",
 };
 
+const roundTypeLabels: Record<string, string> = {
+  ROUND_ROBIN: "Todos contra todos",
+  KNOCKOUT: "Eliminacion directa",
+  POINTS_CLASSIFICATION: "Clasificacion por puntos",
+  GROUP_STAGE: "Fase de grupos",
+};
+
+const tiebreakerLabels: Record<string, string> = {
+  HEAD_TO_HEAD: "Enfrentamiento directo",
+  GOAL_DIFFERENCE: "Diferencia de goles",
+  GOALS_FOR: "Goles a favor",
+  GOALS_AGAINST: "Goles en contra",
+  FAIR_PLAY: "Juego limpio",
+  PENALTY_SHOOTOUT: "Tiros penales",
+  LOTS_DRAWING: "Sorteo",
+  AWAY_GOALS: "Goles de visitante",
+  WINS: "Victorias",
+  DRAWS: "Empates",
+};
+
+const allTiebreakerOptions = Object.keys(tiebreakerLabels);
+
 export default function TournamentDetailPage() {
   const searchParams = useSearchParams();
   const tournamentId = searchParams.get("id");
@@ -57,6 +79,25 @@ export default function TournamentDetailPage() {
   });
   const [loading, setLoading] = useState(true);
 
+  // Rounds state
+  const [rounds, setRounds] = useState<any[]>([]);
+  const [roundDialogOpen, setRoundDialogOpen] = useState(false);
+  const [roundForm, setRoundForm] = useState({
+    roundNumber: "",
+    name: "",
+    type: "ROUND_ROBIN",
+    teamsAdvancing: "",
+    legs: "1",
+  });
+
+  // Tiebreakers state
+  const [tiebreakers, setTiebreakers] = useState<any[]>([]);
+  const [tiebreakerDialogOpen, setTiebreakerDialogOpen] = useState(false);
+  const [tiebreakerList, setTiebreakerList] = useState<{ criteria: string; priority: number }[]>([]);
+
+  // Match day filter
+  const [filterDay, setFilterDay] = useState<string>("all");
+
   const fetchTournament = () => {
     if (!tournamentId) return;
     api.get(`/tournaments/${tournamentId}`).then((res) => {
@@ -64,8 +105,24 @@ export default function TournamentDetailPage() {
     }).catch(() => toast.error("Error al cargar torneo")).finally(() => setLoading(false));
   };
 
+  const fetchRounds = () => {
+    if (!tournamentId) return;
+    api.get(`/tournaments/${tournamentId}/rounds`).then((res) => {
+      setRounds(res.data || []);
+    }).catch(() => {});
+  };
+
+  const fetchTiebreakers = () => {
+    if (!tournamentId) return;
+    api.get(`/tournaments/${tournamentId}/tiebreakers`).then((res) => {
+      setTiebreakers(res.data || []);
+    }).catch(() => {});
+  };
+
   useEffect(() => {
     fetchTournament();
+    fetchRounds();
+    fetchTiebreakers();
     api.get("/teams?limit=100").then((res) => setAllTeams(res.data.data || [])).catch(() => {});
   }, [tournamentId]);
 
@@ -133,12 +190,95 @@ export default function TournamentDetailPage() {
     }
   };
 
+  // Rounds handlers
+  const handleCreateRound = async () => {
+    try {
+      await api.post(`/tournaments/${tournamentId}/rounds`, {
+        roundNumber: Number(roundForm.roundNumber),
+        name: roundForm.name || undefined,
+        type: roundForm.type,
+        teamsAdvancing: roundForm.teamsAdvancing ? Number(roundForm.teamsAdvancing) : undefined,
+        legs: Number(roundForm.legs),
+      });
+      toast.success("Ronda creada");
+      setRoundDialogOpen(false);
+      setRoundForm({ roundNumber: "", name: "", type: "ROUND_ROBIN", teamsAdvancing: "", legs: "1" });
+      fetchRounds();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al crear ronda");
+    }
+  };
+
+  const handleDeleteRound = async (roundId: string) => {
+    if (!confirm("¿Eliminar esta ronda?")) return;
+    try {
+      await api.delete(`/tournaments/rounds/${roundId}`);
+      toast.success("Ronda eliminada");
+      fetchRounds();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al eliminar ronda");
+    }
+  };
+
+  // Tiebreakers handlers
+  const openTiebreakerConfig = () => {
+    if (tiebreakers.length > 0) {
+      setTiebreakerList(tiebreakers.map((t: any) => ({ criteria: t.criteria, priority: t.priority })));
+    } else {
+      setTiebreakerList([
+        { criteria: "GOAL_DIFFERENCE", priority: 1 },
+        { criteria: "GOALS_FOR", priority: 2 },
+        { criteria: "HEAD_TO_HEAD", priority: 3 },
+      ]);
+    }
+    setTiebreakerDialogOpen(true);
+  };
+
+  const handleSaveTiebreakers = async () => {
+    try {
+      await api.post(`/tournaments/${tournamentId}/tiebreakers`, {
+        tiebreakers: tiebreakerList,
+      });
+      toast.success("Criterios de desempate guardados");
+      setTiebreakerDialogOpen(false);
+      fetchTiebreakers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al guardar criterios");
+    }
+  };
+
+  const addTiebreakerItem = () => {
+    const used = new Set(tiebreakerList.map((t) => t.criteria));
+    const next = allTiebreakerOptions.find((o) => !used.has(o));
+    if (!next) return;
+    setTiebreakerList([...tiebreakerList, { criteria: next, priority: tiebreakerList.length + 1 }]);
+  };
+
+  const removeTiebreakerItem = (index: number) => {
+    const updated = tiebreakerList.filter((_, i) => i !== index).map((t, i) => ({ ...t, priority: i + 1 }));
+    setTiebreakerList(updated);
+  };
+
+  const moveTiebreaker = (index: number, direction: "up" | "down") => {
+    const newList = [...tiebreakerList];
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= newList.length) return;
+    [newList[index], newList[swapIndex]] = [newList[swapIndex], newList[index]];
+    setTiebreakerList(newList.map((t, i) => ({ ...t, priority: i + 1 })));
+  };
+
   if (loading) return <p className="text-muted-foreground p-6">Cargando...</p>;
   if (!tournament) return <p className="text-muted-foreground p-6">Torneo no encontrado.</p>;
 
   const tournamentTeamIds = new Set(tournament.teams?.map((t: any) => t.teamId) || []);
   const availableTeams = allTeams.filter((t) => !tournamentTeamIds.has(t.id));
   const status = statusLabels[tournament.status] || { label: tournament.status, className: "" };
+
+  // Get unique day numbers for match filter
+  const dayNumbers = Array.from(new Set((tournament.matches || []).map((m: any) => m.dayNumber).filter(Boolean)) as Set<number>).sort((a, b) => a - b);
+  const filteredMatches = filterDay === "all"
+    ? (tournament.matches || [])
+    : (tournament.matches || []).filter((m: any) => String(m.dayNumber) === filterDay);
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -209,6 +349,8 @@ export default function TournamentDetailPage() {
         <TabsList>
           <TabsTrigger value="teams">Equipos</TabsTrigger>
           <TabsTrigger value="matches">Partidos</TabsTrigger>
+          <TabsTrigger value="rounds">Rondas</TabsTrigger>
+          <TabsTrigger value="tiebreakers">Desempate</TabsTrigger>
         </TabsList>
 
         <TabsContent value="teams">
@@ -269,99 +411,114 @@ export default function TournamentDetailPage() {
 
         <TabsContent value="matches">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
               <CardTitle>Partidos</CardTitle>
-              {canManage && (
-                <div className="flex gap-2">
-                  {tournament.teams?.length >= 2 && (
-                    <Dialog open={fixtureDialogOpen} onOpenChange={setFixtureDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" variant="outline">
-                          <Calendar className="h-4 w-4 mr-2" />Generar Fixture
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Generar Fixture</DialogTitle>
-                          <DialogDescription>
-                            Configura las opciones para generar el fixture automaticamente.
-                            Tipo: {typeLabels[tournament.type] || tournament.type} | {tournament.teams?.length || 0} equipos
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          {(tournament.type === "LEAGUE" || tournament.type === "GROUPS") && (
-                            <div className="space-y-2">
-                              <Label>Modalidad</Label>
-                              <Select value={fixtureConfig.legs} onValueChange={(v) => setFixtureConfig(prev => ({ ...prev, legs: v }))}>
-                                <SelectTrigger><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="1">Solo ida</SelectItem>
-                                  <SelectItem value="2">Ida y vuelta</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          )}
-                          <div className="space-y-2">
-                            <Label>Fecha de inicio</Label>
-                            <Input
-                              type="date"
-                              value={fixtureConfig.startDate}
-                              onChange={(e) => setFixtureConfig(prev => ({ ...prev, startDate: e.target.value }))}
-                              placeholder="Usa la fecha del torneo si no se especifica"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Dias entre jornadas</Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={30}
-                                value={fixtureConfig.intervalDays}
-                                onChange={(e) => setFixtureConfig(prev => ({ ...prev, intervalDays: e.target.value }))}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Hora de partidos</Label>
-                              <Input
-                                type="time"
-                                value={fixtureConfig.matchTime}
-                                onChange={(e) => setFixtureConfig(prev => ({ ...prev, matchTime: e.target.value }))}
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Sede por defecto (opcional)</Label>
-                            <Input
-                              value={fixtureConfig.defaultVenue}
-                              onChange={(e) => setFixtureConfig(prev => ({ ...prev, defaultVenue: e.target.value }))}
-                              placeholder="Ej: Cancha Municipal"
-                            />
-                          </div>
-                          <Button onClick={handleGenerateFixture} disabled={fixtureLoading} className="w-full">
-                            {fixtureLoading ? "Generando..." : "Generar Fixture"}
+              <div className="flex gap-2 items-center flex-wrap">
+                {dayNumbers.length > 1 && (
+                  <Select value={filterDay} onValueChange={setFilterDay}>
+                    <SelectTrigger className="w-[140px] h-8 text-xs">
+                      <SelectValue placeholder="Jornada" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las jornadas</SelectItem>
+                      {dayNumbers.map((d: any) => (
+                        <SelectItem key={d} value={String(d)}>Jornada {d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {canManage && (
+                  <>
+                    {tournament.teams?.length >= 2 && (
+                      <Dialog open={fixtureDialogOpen} onOpenChange={setFixtureDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" variant="outline">
+                            <Calendar className="h-4 w-4 mr-2" />Generar Fixture
                           </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                  {tournament.matches?.length > 0 && (
-                    <Button size="sm" variant="destructive" onClick={handleDeleteFixture}>
-                      <Trash2 className="h-4 w-4 mr-2" />Eliminar Fixture
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Generar Fixture</DialogTitle>
+                            <DialogDescription>
+                              Configura las opciones para generar el fixture automaticamente.
+                              Tipo: {typeLabels[tournament.type] || tournament.type} | {tournament.teams?.length || 0} equipos
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            {(tournament.type === "LEAGUE" || tournament.type === "GROUPS") && (
+                              <div className="space-y-2">
+                                <Label>Modalidad</Label>
+                                <Select value={fixtureConfig.legs} onValueChange={(v) => setFixtureConfig(prev => ({ ...prev, legs: v }))}>
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="1">Solo ida</SelectItem>
+                                    <SelectItem value="2">Ida y vuelta</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+                            <div className="space-y-2">
+                              <Label>Fecha de inicio</Label>
+                              <Input
+                                type="date"
+                                value={fixtureConfig.startDate}
+                                onChange={(e) => setFixtureConfig(prev => ({ ...prev, startDate: e.target.value }))}
+                                placeholder="Usa la fecha del torneo si no se especifica"
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Dias entre jornadas</Label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={30}
+                                  value={fixtureConfig.intervalDays}
+                                  onChange={(e) => setFixtureConfig(prev => ({ ...prev, intervalDays: e.target.value }))}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Hora de partidos</Label>
+                                <Input
+                                  type="time"
+                                  value={fixtureConfig.matchTime}
+                                  onChange={(e) => setFixtureConfig(prev => ({ ...prev, matchTime: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Sede por defecto (opcional)</Label>
+                              <Input
+                                value={fixtureConfig.defaultVenue}
+                                onChange={(e) => setFixtureConfig(prev => ({ ...prev, defaultVenue: e.target.value }))}
+                                placeholder="Ej: Cancha Municipal"
+                              />
+                            </div>
+                            <Button onClick={handleGenerateFixture} disabled={fixtureLoading} className="w-full">
+                              {fixtureLoading ? "Generando..." : "Generar Fixture"}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                    {tournament.matches?.length > 0 && (
+                      <Button size="sm" variant="destructive" onClick={handleDeleteFixture}>
+                        <Trash2 className="h-4 w-4 mr-2" />Eliminar Fixture
+                      </Button>
+                    )}
+                    <Button size="sm" asChild>
+                      <Link href={`/dashboard/matches/new`}><Plus className="h-4 w-4 mr-2" />Manual</Link>
                     </Button>
-                  )}
-                  <Button size="sm" asChild>
-                    <Link href={`/dashboard/matches/new`}><Plus className="h-4 w-4 mr-2" />Manual</Link>
-                  </Button>
-                </div>
-              )}
+                  </>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
-              {(!tournament.matches || tournament.matches.length === 0) ? (
+              {filteredMatches.length === 0 ? (
                 <p className="text-muted-foreground text-sm text-center py-6">No hay partidos programados.</p>
               ) : (
                 <div className="space-y-2">
-                  {tournament.matches.map((m: any) => {
+                  {filteredMatches.map((m: any) => {
                     const teamA = tournament.teams?.find((tt: any) => tt.teamId === m.teamAId)?.team;
                     const teamB = tournament.teams?.find((tt: any) => tt.teamId === m.teamBId)?.team;
                     return (
@@ -393,6 +550,209 @@ export default function TournamentDetailPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Rounds tab */}
+        <TabsContent value="rounds">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <ListOrdered className="h-5 w-5" />
+                Rondas del Torneo
+              </CardTitle>
+              {canManage && (
+                <Dialog open={roundDialogOpen} onOpenChange={setRoundDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm"><Plus className="h-4 w-4 mr-2" />Nueva Ronda</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Crear Ronda</DialogTitle>
+                      <DialogDescription>Define una nueva ronda o fase del torneo.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Numero de ronda *</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={roundForm.roundNumber}
+                            onChange={(e) => setRoundForm(prev => ({ ...prev, roundNumber: e.target.value }))}
+                            placeholder="1"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Vueltas (ida/vuelta)</Label>
+                          <Select value={roundForm.legs} onValueChange={(v) => setRoundForm(prev => ({ ...prev, legs: v }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">Solo ida</SelectItem>
+                              <SelectItem value="2">Ida y vuelta</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Nombre (opcional)</Label>
+                        <Input
+                          value={roundForm.name}
+                          onChange={(e) => setRoundForm(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="Ej: Fase de Grupos, Cuartos de Final"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Tipo de ronda *</Label>
+                        <Select value={roundForm.type} onValueChange={(v) => setRoundForm(prev => ({ ...prev, type: v }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(roundTypeLabels).map(([k, v]) => (
+                              <SelectItem key={k} value={k}>{v}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Equipos que avanzan (opcional)</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={roundForm.teamsAdvancing}
+                          onChange={(e) => setRoundForm(prev => ({ ...prev, teamsAdvancing: e.target.value }))}
+                          placeholder="Ej: 8"
+                        />
+                      </div>
+                      <Button onClick={handleCreateRound} disabled={!roundForm.roundNumber} className="w-full">
+                        Crear Ronda
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </CardHeader>
+            <CardContent>
+              {rounds.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-6">
+                  No hay rondas configuradas. {canManage && "Crea una para organizar las fases del torneo."}
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {rounds.sort((a: any, b: any) => a.roundNumber - b.roundNumber).map((round: any) => (
+                    <div key={round.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                          {round.roundNumber}
+                        </div>
+                        <div>
+                          <p className="font-medium">{round.name || `Ronda ${round.roundNumber}`}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <Badge variant="outline" className="text-xs">{roundTypeLabels[round.type] || round.type}</Badge>
+                            {round.legs > 1 && <span className="text-xs text-muted-foreground">Ida y vuelta</span>}
+                            {round.teamsAdvancing && <span className="text-xs text-muted-foreground">Avanzan {round.teamsAdvancing}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      {canManage && (
+                        <Button size="icon" variant="ghost" onClick={() => handleDeleteRound(round.id)}>
+                          <Trash2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tiebreakers tab */}
+        <TabsContent value="tiebreakers">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5" />
+                Criterios de Desempate
+              </CardTitle>
+              {canManage && (
+                <Button size="sm" onClick={openTiebreakerConfig}>
+                  <Settings2 className="h-4 w-4 mr-2" />Configurar
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {tiebreakers.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-6">
+                  No hay criterios de desempate configurados. {canManage && "Se usara el orden por defecto (diferencia de goles, goles a favor)."}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {tiebreakers.sort((a: any, b: any) => a.priority - b.priority).map((tb: any) => (
+                    <div key={tb.id || tb.criteria} className="flex items-center gap-3 p-3 border rounded-lg">
+                      <span className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs">
+                        {tb.priority}
+                      </span>
+                      <span className="font-medium text-sm">{tiebreakerLabels[tb.criteria] || tb.criteria}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tiebreaker config dialog */}
+          <Dialog open={tiebreakerDialogOpen} onOpenChange={setTiebreakerDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Configurar Criterios de Desempate</DialogTitle>
+                <DialogDescription>Ordena los criterios por prioridad. El primero se evalua primero.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {tiebreakerList.map((item, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 border rounded-lg bg-muted/30">
+                    <span className="text-xs font-bold text-muted-foreground w-5">{index + 1}</span>
+                    <Select
+                      value={item.criteria}
+                      onValueChange={(v) => {
+                        const updated = [...tiebreakerList];
+                        updated[index] = { ...updated[index], criteria: v };
+                        setTiebreakerList(updated);
+                      }}
+                    >
+                      <SelectTrigger className="flex-1 h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allTiebreakerOptions.map((opt) => (
+                          <SelectItem key={opt} value={opt} disabled={tiebreakerList.some((t, i) => i !== index && t.criteria === opt)}>
+                            {tiebreakerLabels[opt]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-0.5">
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => moveTiebreaker(index, "up")} disabled={index === 0}>
+                        <span className="text-xs">▲</span>
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => moveTiebreaker(index, "down")} disabled={index === tiebreakerList.length - 1}>
+                        <span className="text-xs">▼</span>
+                      </Button>
+                    </div>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeTiebreakerItem(index)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              {tiebreakerList.length < allTiebreakerOptions.length && (
+                <Button variant="outline" size="sm" onClick={addTiebreakerItem}>
+                  <Plus className="h-4 w-4 mr-2" />Agregar criterio
+                </Button>
+              )}
+              <Button onClick={handleSaveTiebreakers} className="w-full">
+                Guardar Criterios
+              </Button>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
     </div>

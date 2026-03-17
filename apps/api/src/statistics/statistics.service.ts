@@ -13,6 +13,8 @@ export interface StandingRow {
   goalsAgainst: number;
   goalDifference: number;
   points: number;
+  yellowCards: number;
+  redCards: number;
 }
 
 export interface TopScorer {
@@ -67,6 +69,8 @@ export class StatisticsService {
         goalsAgainst: 0,
         goalDifference: 0,
         points: 0,
+        yellowCards: 0,
+        redCards: 0,
       });
     }
 
@@ -95,18 +99,76 @@ export class StatisticsService {
       }
     }
 
+    // Count cards for fair play tiebreaker
+    const cardEvents = await this.prisma.matchEvent.findMany({
+      where: {
+        match: { tournamentId, status: 'FINISHED' },
+        type: { in: ['YELLOW_CARD', 'RED_CARD', 'YELLOW_RED_CARD'] },
+      },
+      select: { teamId: true, type: true },
+    });
+
+    for (const event of cardEvents) {
+      const team = standingsMap.get(event.teamId);
+      if (team) {
+        if (event.type === 'YELLOW_CARD') team.yellowCards++;
+        else if (event.type === 'RED_CARD') team.redCards++;
+        else if (event.type === 'YELLOW_RED_CARD') { team.yellowCards++; team.redCards++; }
+      }
+    }
+
     const standings = Array.from(standingsMap.values());
     for (const s of standings) {
       s.goalDifference = s.goalsFor - s.goalsAgainst;
     }
 
-    // Sort: points desc, goal difference desc, goals for desc, name asc
-    standings.sort((a, b) =>
-      b.points - a.points ||
-      b.goalDifference - a.goalDifference ||
-      b.goalsFor - a.goalsFor ||
-      a.teamName.localeCompare(b.teamName),
-    );
+    // Load tiebreaker configuration
+    const tiebreakers = await this.prisma.tournamentTiebreaker.findMany({
+      where: { tournamentId, roundId: null },
+      orderBy: { priority: 'asc' },
+    });
+
+    // If no custom tiebreakers configured, use default FIFA order
+    const tiebreakerOrder = tiebreakers.length > 0
+      ? tiebreakers.map(t => t.criteria)
+      : ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD', 'FAIR_PLAY'];
+
+    // Sort function
+    standings.sort((a, b) => {
+      // Points always first
+      if (b.points !== a.points) return b.points - a.points;
+
+      // Apply tiebreakers in order
+      for (const criteria of tiebreakerOrder) {
+        let diff = 0;
+        switch (criteria) {
+          case 'GOAL_DIFFERENCE':
+            diff = b.goalDifference - a.goalDifference;
+            break;
+          case 'GOALS_FOR':
+            diff = b.goalsFor - a.goalsFor;
+            break;
+          case 'GOALS_AGAINST':
+            diff = a.goalsAgainst - b.goalsAgainst; // Less goals against is better
+            break;
+          case 'WINS':
+            diff = b.won - a.won;
+            break;
+          case 'DRAWS':
+            diff = b.drawn - a.drawn;
+            break;
+          case 'FAIR_PLAY':
+            diff = (a.yellowCards || 0) - (b.yellowCards || 0); // Less cards is better
+            break;
+          case 'HEAD_TO_HEAD':
+            // Would need specific match data - skip for now, handled by existing GD/GF
+            break;
+        }
+        if (diff !== 0) return diff;
+      }
+
+      return a.teamName.localeCompare(b.teamName);
+    });
 
     return standings;
   }

@@ -26,6 +26,7 @@ export class SanctionsService {
         data: {
           playerId,
           tournamentId,
+          matchId,
           type: 'RED_CARD',
           matchesBanned: 1,
           reason: `Tarjeta roja directa en partido ${matchId}`,
@@ -41,6 +42,7 @@ export class SanctionsService {
         data: {
           playerId,
           tournamentId,
+          matchId,
           type: 'RED_CARD',
           matchesBanned: 1,
           reason: `Doble amarilla en partido ${matchId}`,
@@ -123,6 +125,19 @@ export class SanctionsService {
   async getActiveSanctionCount(playerId: string, tournamentId: string): Promise<number> {
     return this.prisma.sanction.count({
       where: { playerId, tournamentId, isActive: true },
+    });
+  }
+
+  async getActiveSanctions(playerId: string, tournamentId: string) {
+    return this.prisma.sanction.findMany({
+      where: { playerId, tournamentId, isActive: true },
+    });
+  }
+
+  async unlockPlayer(sanctionId: string, reason: string) {
+    return this.prisma.sanction.update({
+      where: { id: sanctionId },
+      data: { isActive: false, reason: reason ? `DESBLOQUEADO: ${reason}` : 'Desbloqueado por super admin' },
     });
   }
 }

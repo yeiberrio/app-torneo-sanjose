@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateMatchDto } from './dto/create-match.dto';
 import { CreateMatchEventDto } from './dto/create-match-event.dto';
@@ -64,14 +64,49 @@ export class MatchesService {
     return match;
   }
 
-  async update(id: string, dto: Partial<CreateMatchDto>) {
-    return this.prisma.match.update({
-      where: { id },
-      data: { ...dto, scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined },
-    });
+  async update(id: string, dto: Partial<CreateMatchDto> & { scoreA?: number; scoreB?: number; refereeReport?: string }) {
+    const match = await this.prisma.match.findUnique({ where: { id } });
+    if (!match) throw new NotFoundException('Partido no encontrado');
+
+    const data: any = {};
+    if (dto.scheduledAt) data.scheduledAt = new Date(dto.scheduledAt);
+    if (dto.venue !== undefined) data.venue = dto.venue;
+    if (dto.teamAId) data.teamAId = dto.teamAId;
+    if (dto.teamBId) data.teamBId = dto.teamBId;
+    if (dto.matchNumber !== undefined) data.matchNumber = dto.matchNumber;
+    if (dto.dayNumber !== undefined) data.dayNumber = dto.dayNumber;
+    if (dto.refereeId !== undefined) data.refereeId = dto.refereeId;
+    if (dto.scorekeeperId !== undefined) data.scorekeeperId = dto.scorekeeperId;
+    if (dto.observerId !== undefined) data.observerId = dto.observerId;
+    if (dto.scoreA !== undefined) data.scoreA = dto.scoreA;
+    if (dto.scoreB !== undefined) data.scoreB = dto.scoreB;
+    if (dto.refereeReport !== undefined) data.refereeReport = dto.refereeReport;
+
+    return this.prisma.match.update({ where: { id }, data });
   }
 
   async addEvent(matchId: string, dto: CreateMatchEventDto, userId: string) {
+    // Check if player is blocked by active sanctions
+    if (dto.playerId) {
+      const matchData = await this.prisma.match.findUnique({
+        where: { id: matchId },
+        select: { tournamentId: true, teamAId: true, teamBId: true, scoreA: true, scoreB: true },
+      });
+      if (matchData) {
+        const playerSanctions = await this.sanctionsService.getActiveSanctions(dto.playerId, matchData.tournamentId);
+        if (playerSanctions.length > 0) {
+          // Allow card events even for blocked players (they might get a card during the match before being detected)
+          // But block goal/assist events
+          if (['GOAL', 'PENALTY_SCORED', 'SUBSTITUTION_IN'].includes(dto.type)) {
+            const reasons = playerSanctions.map(s => s.reason).join('; ');
+            throw new BadRequestException(
+              `Jugador inhabilitado: ${reasons}. No puede participar activamente en el partido.`
+            );
+          }
+        }
+      }
+    }
+
     const event = await this.prisma.matchEvent.create({
       data: { ...dto, matchId, createdBy: userId },
     });
@@ -112,6 +147,49 @@ export class MatchesService {
     }
 
     return event;
+  }
+
+  async deleteEvent(eventId: string) {
+    const event = await this.prisma.matchEvent.findUnique({
+      where: { id: eventId },
+      include: { match: true },
+    });
+    if (!event) throw new NotFoundException('Evento no encontrado');
+
+    // Recalculate score if it was a goal event
+    if (['GOAL', 'PENALTY_SCORED', 'OWN_GOAL'].includes(event.type) && event.match) {
+      const match = event.match;
+      let scoreA = match.scoreA || 0;
+      let scoreB = match.scoreB || 0;
+
+      if (event.type === 'OWN_GOAL') {
+        // Own goal was for the OTHER team
+        if (event.teamId === match.teamAId) scoreB = Math.max(0, scoreB - 1);
+        else scoreA = Math.max(0, scoreA - 1);
+      } else {
+        if (event.teamId === match.teamAId) scoreA = Math.max(0, scoreA - 1);
+        else scoreB = Math.max(0, scoreB - 1);
+      }
+
+      await this.prisma.match.update({
+        where: { id: match.id },
+        data: { scoreA, scoreB },
+      });
+    }
+
+    await this.prisma.matchEvent.delete({ where: { id: eventId } });
+    return { message: 'Evento eliminado' };
+  }
+
+  async deleteMatch(id: string) {
+    const match = await this.prisma.match.findUnique({ where: { id } });
+    if (!match) throw new NotFoundException('Partido no encontrado');
+
+    // Delete all events and stats first
+    await this.prisma.matchEvent.deleteMany({ where: { matchId: id } });
+    await this.prisma.matchPlayerStat.deleteMany({ where: { matchId: id } });
+    await this.prisma.match.delete({ where: { id } });
+    return { message: 'Partido eliminado' };
   }
 
   async updateStatus(id: string, status: string) {

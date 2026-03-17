@@ -141,6 +141,26 @@ enum NewsCategory {
   ANNOUNCEMENT
 }
 
+enum RoundType {
+  ROUND_ROBIN
+  KNOCKOUT
+  POINTS_CLASSIFICATION
+  GROUP_STAGE
+}
+
+enum TiebreakerCriteria {
+  HEAD_TO_HEAD
+  GOAL_DIFFERENCE
+  GOALS_FOR
+  GOALS_AGAINST
+  FAIR_PLAY
+  PENALTY_SHOOTOUT
+  LOTS_DRAWING
+  AWAY_GOALS
+  WINS
+  DRAWS
+}
+
 // ---- MODELS ----
 
 model User {
@@ -269,6 +289,8 @@ model Tournament {
   teams            TournamentTeam[]
   matches          Match[]
   news             News[]
+  rounds           TournamentRound[]
+  tiebreakers      TournamentTiebreaker[]
 
   @@map("tournaments")
 }
@@ -349,6 +371,8 @@ model Match {
   scorekeeperId  String?
   observerId     String?
   refereeReport  String?
+  roundId        String?
+  round          TournamentRound? @relation(fields: [roundId], references: [id])
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -400,6 +424,8 @@ model Sanction {
   type          SanctionType
   matchesBanned Int          @default(1)
   reason        String?
+  matchId       String?
+  matchesServed Int          @default(0)
   isActive      Boolean      @default(true)
   imposedBy     String
   imposedAt     DateTime     @default(now())
@@ -424,6 +450,40 @@ model News {
   updatedAt     DateTime      @updatedAt
 
   @@map("news")
+}
+
+model TournamentRound {
+  id              String    @id @default(cuid())
+  tournamentId    String
+  tournament      Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  roundNumber     Int
+  name            String?
+  type            RoundType
+  teamsAdvancing  Int?
+  advanceAll      Boolean   @default(false)
+  legs            Int       @default(1)
+  isActive        Boolean   @default(false)
+  isCompleted     Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  matches         Match[]
+  tiebreakers     TournamentTiebreaker[]
+
+  @@unique([tournamentId, roundNumber])
+  @@map("tournament_rounds")
+}
+
+model TournamentTiebreaker {
+  id              String              @id @default(cuid())
+  tournamentId    String
+  tournament      Tournament          @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  roundId         String?
+  round           TournamentRound?    @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  criteria        TiebreakerCriteria
+  priority        Int
+
+  @@unique([tournamentId, roundId, criteria])
+  @@map("tournament_tiebreakers")
 }
 
 model AuditLog {

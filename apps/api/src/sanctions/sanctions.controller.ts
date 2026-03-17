@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { SanctionsService } from './sanctions.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -34,5 +34,28 @@ export class SanctionsController {
   @ApiOperation({ summary: 'Desactivar sancion (cumplida)' })
   deactivate(@Param('id') id: string) {
     return this.sanctionsService.deactivate(id);
+  }
+
+  @Patch(':id/unlock')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'manage', subject: 'Sanction' })
+  @ApiOperation({ summary: 'Desbloquear jugador (solo super admin)' })
+  unlockPlayer(@Param('id') id: string, @Body('reason') reason?: string) {
+    return this.sanctionsService.unlockPlayer(id, reason || '');
+  }
+
+  @Get('player/:playerId/:tournamentId/status')
+  @ApiOperation({ summary: 'Estado de habilitacion del jugador' })
+  async getPlayerStatus(
+    @Param('playerId') playerId: string,
+    @Param('tournamentId') tournamentId: string,
+  ) {
+    const activeSanctions = await this.sanctionsService.getActiveSanctions(playerId, tournamentId);
+    return {
+      isBlocked: activeSanctions.length > 0,
+      sanctions: activeSanctions,
+      reasons: activeSanctions.map(s => s.reason),
+    };
   }
 }

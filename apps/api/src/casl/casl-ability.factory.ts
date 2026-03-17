@@ -58,7 +58,7 @@ export class CaslAbilityFactory {
         can('read', 'MatchEvent');
         can('manage', 'News');
         can('read', 'User');
-        can('read', 'Sanction');
+        can('manage', 'Sanction');
         break;
 
       case Role.REFEREE:

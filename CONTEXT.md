@@ -1255,4 +1255,150 @@ SEED_SUPER_ADMIN_PASSWORD="ChangeMe123!@#"
 
 ---
 
-*Documento generado para desarrollo enterprise. Version 1.3 — SportManager Pro — Actualizado: 2026-03-15*
+---
+
+## 18. MEJORAS IMPLEMENTADAS (Sprint 2026-03-15)
+
+### 18.1 Fixtures Dinamicos por Rondas (COMPLETADO - Backend)
+
+Se implemento un sistema de rondas (`TournamentRound`) que permite definir diferentes tipos de fixture por cada ronda del torneo:
+
+**Nuevos modelos de base de datos:**
+- `TournamentRound`: Define rondas con tipo (`ROUND_ROBIN`, `KNOCKOUT`, `POINTS_CLASSIFICATION`, `GROUP_STAGE`), cantidad de equipos que avanzan, si avanzan todos, numero de legs.
+- `TournamentTiebreaker`: Criterios de desempate configurables por torneo y/o por ronda.
+- `Match.roundId`: Los partidos ahora pueden asociarse a una ronda especifica.
+
+**Nuevos endpoints:**
+- `POST /tournaments/:id/rounds` — Crear ronda
+- `GET /tournaments/:id/rounds` — Listar rondas del torneo
+- `PATCH /tournaments/rounds/:roundId` — Actualizar ronda
+- `DELETE /tournaments/rounds/:roundId` — Eliminar ronda
+- `POST /tournaments/:id/generate-fixture` — Ahora acepta `roundId` para generar fixture por ronda
+- `POST /tournaments/:id/teams/:teamId/mid-tournament` — Agregar equipo a torneo en curso (genera partidos adicionales automaticamente)
+
+### 18.2 Criterios de Desempate Dinamicos (COMPLETADO - Backend)
+
+Criterios configurables estilo FIFA/CONMEBOL:
+
+**Criterios disponibles:** `HEAD_TO_HEAD`, `GOAL_DIFFERENCE`, `GOALS_FOR`, `GOALS_AGAINST`, `FAIR_PLAY`, `PENALTY_SHOOTOUT`, `LOTS_DRAWING`, `AWAY_GOALS`, `WINS`, `DRAWS`
+
+**Endpoints:**
+- `POST /tournaments/:id/tiebreakers` — Configurar criterios de desempate (global o por ronda)
+- `GET /tournaments/:id/tiebreakers` — Ver criterios configurados
+
+**Logica de standings actualizada:**
+- Si hay tiebreakers configurados, se aplican en orden de prioridad
+- Si no hay configuracion, se usan los criterios por defecto: diferencia de goles, goles a favor, head-to-head, fair play
+- Fair play ahora calcula tarjetas amarillas y rojas por equipo
+
+### 18.3 Bloqueo de Jugadores Expulsados (COMPLETADO - Backend)
+
+- Al registrar eventos (goles, sustituciones) se verifica si el jugador tiene sanciones activas
+- Si el jugador esta inhabilitado, se bloquean eventos de participacion activa (GOAL, PENALTY_SCORED, SUBSTITUTION_IN) con mensaje de motivo
+- Se permiten eventos de tarjeta incluso para jugadores bloqueados (para registrar infracciones durante el partido)
+
+**Nuevo endpoint:**
+- `GET /sanctions/player/:playerId/:tournamentId/status` — Consultar estado de habilitacion
+
+### 18.4 Desbloqueo de Jugadores por Super Admin (COMPLETADO - Backend)
+
+**Nuevo endpoint:**
+- `PATCH /sanctions/:id/unlock` — Desbloquear jugador (requiere permiso `manage` en `Sanction`, solo SUPER_ADMIN y ADMIN)
+
+### 18.5 Edicion de Partidos Finalizados (COMPLETADO - Backend)
+
+- El endpoint `PATCH /matches/:id` ahora permite editar partidos en cualquier estado (incluyendo FINISHED, CANCELLED, POSTPONED)
+- Se pueden modificar: marcador (`scoreA`, `scoreB`), equipos, fecha, sede, arbitro, informe arbitral
+- Se agrego eliminacion de eventos: `DELETE /matches/:id/events/:eventId` (recalcula marcador automaticamente)
+- Se agrego eliminacion de partidos: `DELETE /matches/:id`
+
+### 18.6 CRUD Completo de Entidades (COMPLETADO - Backend)
+
+- **Jugadores:** Se agrego `DELETE /players/:id` con limpieza en cascada de eventos, estadisticas y sanciones
+- **Partidos:** Se agrego `DELETE /matches/:id` con limpieza de eventos y estadisticas
+- **Eventos de partido:** Se agrego `DELETE /matches/:id/events/:eventId`
+- **Equipos:** Ya existia DELETE previamente
+- **Rondas:** CRUD completo (crear, leer, actualizar, eliminar)
+- **Tiebreakers:** Configurar y consultar
+
+### 18.7 Subida de Logos de Equipos (COMPLETADO - Backend)
+
+- Nuevo modulo `UploadsModule` con endpoint `POST /uploads/image`
+- Soporta formatos: JPG, JPEG, PNG, GIF, WebP, SVG
+- Limite de 5MB por archivo
+- Archivos servidos estaticamente desde `/uploads/`
+- El campo `logoUrl` en Team ya existia, ahora se puede poblar con la URL del archivo subido
+
+### 18.8 Agregacion de Equipos a Torneo en Curso (COMPLETADO - Backend)
+
+- Endpoint `POST /tournaments/:id/teams/:teamId/mid-tournament`
+- Genera automaticamente partidos contra todos los equipos existentes
+- Calcula fechas basado en el ultimo partido programado
+- Funciona en cualquier fase del torneo
+
+### 18.9 Permisos Actualizados
+
+- ORGANIZER ahora tiene permiso `manage` en `Sanction` (antes solo `read`)
+
+---
+
+## 19. PENDIENTES PARA PROXIMA SESION
+
+### 19.1 Frontend — Interfaz de Usuario (PENDIENTE)
+
+Todas las mejoras del backend estan completas pero **falta implementar la interfaz frontend** para:
+
+1. **Pagina de Torneos (detalle):**
+   - UI para crear/editar/eliminar rondas del torneo
+   - Selector de tipo de ronda (todos contra todos, eliminacion directa, etc.)
+   - Configuracion de equipos que avanzan a siguiente ronda
+   - Generacion de fixture por ronda
+   - Configuracion de criterios de desempate con drag-and-drop para prioridad
+   - Boton para agregar equipo mid-tournament
+
+2. **Pagina de Partidos (detalle):**
+   - Mostrar indicador de jugador bloqueado/inhabilitado en lista de jugadores al registrar eventos
+   - Permitir edicion de marcador en partidos finalizados
+   - Boton para eliminar eventos individuales
+   - Boton para eliminar partido completo
+   - Edicion de informe arbitral
+
+3. **Pagina de Equipos (detalle):**
+   - Boton de subir logo del equipo con preview
+   - Mostrar logo del equipo en planilla, fixture, y tabla de posiciones
+   - Formulario de edicion inline de nombre, ciudad, ano de fundacion
+   - Boton para eliminar equipo
+
+4. **Pagina de Jugadores:**
+   - Formulario de edicion inline
+   - Boton para eliminar jugador
+   - Indicador visual de estado de sancion/bloqueo
+
+5. **Pagina de Sanciones:**
+   - Boton de desbloqueo para super admin
+   - Mostrar motivo de inhabilitacion
+   - Historial completo de sanciones (activas e inactivas)
+
+6. **Pagina de Estadisticas:**
+   - Mostrar criterios de desempate aplicados
+   - Mostrar fair play (tarjetas) en tabla de posiciones
+
+### 19.2 Migracion de Base de Datos (PENDIENTE)
+
+- Ejecutar `npx prisma migrate dev --name add_rounds_tiebreakers_sanctions` en entorno de desarrollo
+- Luego `npx prisma migrate deploy` en produccion (Railway)
+
+### 19.3 Deploy (PENDIENTE)
+
+- Hacer commit y push de todos los cambios
+- Verificar que el build de Railway pase correctamente
+- Verificar que Vercel despliegue el frontend actualizado
+- Ejecutar migracion en base de datos de produccion
+
+### 19.4 Instalacion de Dependencias en Frontend (PENDIENTE)
+
+- No se requieren nuevas dependencias en frontend para las mejoras planeadas (ya tiene shadcn/ui, lucide, etc.)
+
+---
+
+*Documento generado para desarrollo enterprise. Version 1.4 — SportManager Pro — Actualizado: 2026-03-15*

@@ -5,7 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AlertTriangle, ShieldCheck, Unlock } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
@@ -21,10 +24,16 @@ const sanctionTypeLabels: Record<string, string> = {
 export default function SanctionsPage() {
   const { user } = useAuthStore();
   const canManage = user ? can(user.role, "update", "Sanction") : false;
+  const canUnlock = user ? can(user.role, "manage", "Sanction") : false;
   const [tournaments, setTournaments] = useState<any[]>([]);
   const [selectedTournament, setSelectedTournament] = useState("");
   const [sanctions, setSanctions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Unlock dialog state
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
+  const [unlockSanctionId, setUnlockSanctionId] = useState("");
+  const [unlockReason, setUnlockReason] = useState("");
 
   useEffect(() => {
     api.get("/tournaments?limit=100").then((res) => {
@@ -52,6 +61,23 @@ export default function SanctionsPage() {
     }
   };
 
+  const openUnlockDialog = (sanctionId: string) => {
+    setUnlockSanctionId(sanctionId);
+    setUnlockReason("");
+    setUnlockDialogOpen(true);
+  };
+
+  const handleUnlock = async () => {
+    try {
+      await api.patch(`/sanctions/${unlockSanctionId}/unlock`, { reason: unlockReason });
+      toast.success("Jugador desbloqueado exitosamente");
+      setUnlockDialogOpen(false);
+      setSanctions((prev) => prev.filter((s) => s.id !== unlockSanctionId));
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al desbloquear jugador");
+    }
+  };
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -75,7 +101,7 @@ export default function SanctionsPage() {
       ) : sanctions.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
-            <AlertTriangle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <ShieldCheck className="h-12 w-12 mx-auto text-green-500 mb-4" />
             <p className="text-muted-foreground">No hay sanciones activas.</p>
           </CardContent>
         </Card>
@@ -83,9 +109,9 @@ export default function SanctionsPage() {
         <div className="space-y-3">
           {sanctions.map((s) => (
             <Card key={s.id}>
-              <CardContent className="p-4 flex items-center justify-between">
+              <CardContent className="p-4 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                  <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
                     <AlertTriangle className="h-5 w-5 text-red-600" />
                   </div>
                   <div>
@@ -104,7 +130,7 @@ export default function SanctionsPage() {
                     {s.reason && <p className="text-xs text-muted-foreground mt-1">{s.reason}</p>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-muted-foreground">
                     {new Date(s.imposedAt).toLocaleDateString("es-CO")}
                   </span>
@@ -113,12 +139,42 @@ export default function SanctionsPage() {
                       Cumplida
                     </Button>
                   )}
+                  {canUnlock && (
+                    <Button size="sm" variant="destructive" onClick={() => openUnlockDialog(s.id)}>
+                      <Unlock className="h-3.5 w-3.5 mr-1" />Desbloquear
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Unlock dialog */}
+      <Dialog open={unlockDialogOpen} onOpenChange={setUnlockDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desbloquear Jugador</DialogTitle>
+            <DialogDescription>
+              Esta accion desbloquea al jugador antes de cumplir su sancion. Solo disponible para Super Admin.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Motivo del desbloqueo (opcional)</Label>
+              <Input
+                value={unlockReason}
+                onChange={(e) => setUnlockReason(e.target.value)}
+                placeholder="Ej: Sancion revisada por comite disciplinario"
+              />
+            </div>
+            <Button onClick={handleUnlock} className="w-full" variant="destructive">
+              Confirmar Desbloqueo
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

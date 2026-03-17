@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateTournamentDto } from './dto/create-tournament.dto';
 import { UpdateTournamentDto } from './dto/update-tournament.dto';
 import { GenerateFixtureDto } from './dto/generate-fixture.dto';
+import { CreateRoundDto } from './dto/create-round.dto';
+import { ConfigureTiebreakersDto } from './dto/configure-tiebreakers.dto';
 
 @Injectable()
 export class TournamentsService {
@@ -33,6 +35,8 @@ export class TournamentsService {
       include: {
         teams: { include: { team: true } },
         matches: { orderBy: { scheduledAt: 'asc' } },
+        rounds: { orderBy: { roundNumber: 'asc' }, include: { tiebreakers: { orderBy: { priority: 'asc' } } } },
+        tiebreakers: { orderBy: { priority: 'asc' } },
       },
     });
     if (!tournament) throw new NotFoundException('Torneo no encontrado');
@@ -151,6 +155,13 @@ export class TournamentsService {
         status: 'SCHEDULED',
       })),
     });
+
+    if (dto.roundId) {
+      await this.prisma.match.updateMany({
+        where: { tournamentId, roundId: null },
+        data: { roundId: dto.roundId },
+      });
+    }
 
     return {
       message: `Fixture generado exitosamente: ${created.count} partidos creados`,
@@ -330,5 +341,123 @@ export class TournamentsService {
       [array[i], array[j]] = [array[j], array[i]];
     }
     return array;
+  }
+
+  // --- Tournament Rounds ---
+  async createRound(tournamentId: string, dto: CreateRoundDto) {
+    const tournament = await this.prisma.tournament.findUnique({ where: { id: tournamentId } });
+    if (!tournament) throw new NotFoundException('Torneo no encontrado');
+
+    return this.prisma.tournamentRound.create({
+      data: { tournamentId, ...dto, type: dto.type as any },
+    });
+  }
+
+  async getRounds(tournamentId: string) {
+    return this.prisma.tournamentRound.findMany({
+      where: { tournamentId },
+      include: { tiebreakers: { orderBy: { priority: 'asc' } }, _count: { select: { matches: true } } },
+      orderBy: { roundNumber: 'asc' },
+    });
+  }
+
+  async updateRound(roundId: string, dto: Partial<CreateRoundDto>) {
+    const data: any = { ...dto };
+    if (dto.type) data.type = dto.type as any;
+    return this.prisma.tournamentRound.update({
+      where: { id: roundId },
+      data,
+    });
+  }
+
+  async deleteRound(roundId: string) {
+    const matchCount = await this.prisma.match.count({ where: { roundId, status: { in: ['IN_PROGRESS', 'HALFTIME', 'FINISHED'] } } });
+    if (matchCount > 0) throw new BadRequestException('No se puede eliminar una ronda con partidos en curso o finalizados.');
+    await this.prisma.match.deleteMany({ where: { roundId, status: { in: ['SCHEDULED', 'POSTPONED', 'CANCELLED'] } } });
+    return this.prisma.tournamentRound.delete({ where: { id: roundId } });
+  }
+
+  // --- Tiebreakers ---
+  async configureTiebreakers(tournamentId: string, dto: ConfigureTiebreakersDto) {
+    const tournament = await this.prisma.tournament.findUnique({ where: { id: tournamentId } });
+    if (!tournament) throw new NotFoundException('Torneo no encontrado');
+
+    // Delete existing tiebreakers for this scope
+    await this.prisma.tournamentTiebreaker.deleteMany({
+      where: { tournamentId, roundId: dto.roundId || null },
+    });
+
+    // Create new ones
+    const data = dto.tiebreakers.map(tb => ({
+      tournamentId,
+      roundId: dto.roundId || null,
+      criteria: tb.criteria as any,
+      priority: tb.priority,
+    }));
+
+    await this.prisma.tournamentTiebreaker.createMany({ data });
+    return this.prisma.tournamentTiebreaker.findMany({
+      where: { tournamentId, roundId: dto.roundId || null },
+      orderBy: { priority: 'asc' },
+    });
+  }
+
+  async getTiebreakers(tournamentId: string, roundId?: string) {
+    return this.prisma.tournamentTiebreaker.findMany({
+      where: { tournamentId, roundId: roundId || null },
+      orderBy: { priority: 'asc' },
+    });
+  }
+
+  // --- Add team mid-tournament ---
+  async addTeamMidTournament(tournamentId: string, teamId: string, groupName?: string) {
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: { teams: true, matches: true },
+    });
+    if (!tournament) throw new NotFoundException('Torneo no encontrado');
+
+    // Add team to tournament
+    const tournamentTeam = await this.prisma.tournamentTeam.create({
+      data: { tournamentId, teamId, groupName },
+    });
+
+    // If there are existing matches, generate additional matches for the new team
+    if (tournament.matches.length > 0) {
+      const existingTeamIds = tournament.teams.map(t => t.teamId);
+      const lastDayNumber = Math.max(...tournament.matches.map(m => m.dayNumber || 0), 0);
+      const lastMatchNumber = Math.max(...tournament.matches.map(m => m.matchNumber || 0), 0);
+
+      // Get the latest match to determine scheduling pattern
+      const lastMatch = tournament.matches.sort((a, b) => b.scheduledAt.getTime() - a.scheduledAt.getTime())[0];
+      const intervalDays = 7;
+
+      const newMatches: any[] = [];
+      let matchNum = lastMatchNumber;
+      let dayNum = lastDayNumber;
+
+      for (const existingTeamId of existingTeamIds) {
+        matchNum++;
+        dayNum++;
+        const matchDate = new Date(lastMatch?.scheduledAt || new Date());
+        matchDate.setDate(matchDate.getDate() + (dayNum - lastDayNumber) * intervalDays);
+
+        newMatches.push({
+          tournamentId,
+          teamAId: teamId,
+          teamBId: existingTeamId,
+          dayNumber: dayNum,
+          matchNumber: matchNum,
+          scheduledAt: matchDate,
+          status: 'SCHEDULED',
+        });
+      }
+
+      if (newMatches.length > 0) {
+        await this.prisma.match.createMany({ data: newMatches });
+      }
+    }
+
+    return tournamentTeam;
   }
 }

@@ -46,6 +46,18 @@ export class PlayersService {
     });
   }
 
+  async delete(id: string) {
+    const player = await this.prisma.player.findUnique({ where: { id } });
+    if (!player) throw new NotFoundException('Jugador no encontrado');
+
+    // Delete related data first
+    await this.prisma.matchEvent.deleteMany({ where: { playerId: id } });
+    await this.prisma.matchPlayerStat.deleteMany({ where: { playerId: id } });
+    await this.prisma.sanction.deleteMany({ where: { playerId: id } });
+    await this.prisma.player.delete({ where: { id } });
+    return { message: 'Jugador eliminado' };
+  }
+
   async getTopScorers(tournamentId: string, limit = 10) {
     const stats = await this.prisma.matchPlayerStat.groupBy({
       by: ['playerId'],

@@ -9,11 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Clock, CircleDot, Wifi, WifiOff, CalendarClock, Edit } from "lucide-react";
+import { ArrowLeft, Plus, Clock, CircleDot, Wifi, WifiOff, CalendarClock, Edit, Trash2, ShieldAlert, ShieldBan } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
 import { io, Socket } from "socket.io-client";
+import { useAuthStore } from "@/lib/auth-store";
+import { can } from "@/lib/permissions";
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   SCHEDULED: { label: "Programado", className: "bg-blue-100 text-blue-800" },
@@ -50,6 +52,11 @@ const statusFlow: Record<string, string[]> = {
 export default function MatchDetailPage() {
   const searchParams = useSearchParams();
   const matchId = searchParams.get("id");
+  const { user } = useAuthStore();
+  const canManageMatch = user ? can(user.role, "update", "Match") : false;
+  const canManageEvents = user ? can(user.role, "create", "MatchEvent") : false;
+  const canDeleteEvents = user ? can(user.role, "delete", "MatchEvent") : false;
+
   const [match, setMatch] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [playersA, setPlayersA] = useState<any[]>([]);
@@ -70,6 +77,17 @@ export default function MatchDetailPage() {
     scheduledAt: "",
     venue: "",
   });
+
+  // Edit finished match state
+  const [editMatchOpen, setEditMatchOpen] = useState(false);
+  const [editMatchForm, setEditMatchForm] = useState({
+    scoreA: "",
+    scoreB: "",
+  });
+
+  // Blocked players state
+  const [blockedPlayerIds, setBlockedPlayerIds] = useState<Set<string>>(new Set());
+
   const socketRef = useRef<Socket | null>(null);
 
   // WebSocket connection for real-time updates
@@ -124,8 +142,29 @@ export default function MatchDetailPage() {
         setTeamBName(bRes.data.name);
         setPlayersA(aRes.data.players || []);
         setPlayersB(bRes.data.players || []);
+
+        // Check blocked players if tournament exists
+        if (res.data.tournamentId) {
+          const allPlayers = [...(aRes.data.players || []), ...(bRes.data.players || [])];
+          checkBlockedPlayers(allPlayers, res.data.tournamentId);
+        }
       });
     }).catch(() => toast.error("Error al cargar partido")).finally(() => setLoading(false));
+  };
+
+  const checkBlockedPlayers = async (players: any[], tournamentId: string) => {
+    const blocked = new Set<string>();
+    for (const player of players) {
+      try {
+        const res = await api.get(`/sanctions/player/${player.id}/${tournamentId}/status`);
+        if (res.data.isBlocked) {
+          blocked.add(player.id);
+        }
+      } catch {
+        // silently ignore
+      }
+    }
+    setBlockedPlayerIds(blocked);
   };
 
   useEffect(() => { fetchMatch(); }, [matchId]);
@@ -164,6 +203,17 @@ export default function MatchDetailPage() {
     }
   };
 
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!confirm("¿Eliminar este evento?")) return;
+    try {
+      await api.delete(`/matches/${matchId}/events/${eventId}`);
+      toast.success("Evento eliminado");
+      fetchMatch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al eliminar evento");
+    }
+  };
+
   const handleReschedule = async () => {
     try {
       const payload: any = {};
@@ -182,6 +232,39 @@ export default function MatchDetailPage() {
     }
   };
 
+  const handleEditFinishedMatch = async () => {
+    try {
+      const payload: any = {};
+      if (editMatchForm.scoreA !== "") payload.scoreA = Number(editMatchForm.scoreA);
+      if (editMatchForm.scoreB !== "") payload.scoreB = Number(editMatchForm.scoreB);
+      await api.patch(`/matches/${matchId}`, payload);
+      toast.success("Partido actualizado");
+      setEditMatchOpen(false);
+      fetchMatch();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al editar partido");
+    }
+  };
+
+  const openEditFinishedMatch = () => {
+    setEditMatchForm({
+      scoreA: String(match.scoreA ?? 0),
+      scoreB: String(match.scoreB ?? 0),
+    });
+    setEditMatchOpen(true);
+  };
+
+  const handleDeleteMatch = async () => {
+    if (!confirm("¿Eliminar este partido? Esta accion no se puede deshacer.")) return;
+    try {
+      await api.delete(`/matches/${matchId}`);
+      toast.success("Partido eliminado");
+      window.location.href = "/dashboard/matches";
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al eliminar partido");
+    }
+  };
+
   const selectedTeamPlayers = eventForm.teamId === match?.teamAId ? playersA : eventForm.teamId === match?.teamBId ? playersB : [];
 
   if (loading) return <p className="text-muted-foreground p-6">Cargando partido...</p>;
@@ -197,14 +280,38 @@ export default function MatchDetailPage() {
           <Link href="/dashboard/matches"><ArrowLeft className="h-5 w-5" /></Link>
         </Button>
         <h1 className="text-2xl font-bold flex-1">Planilla de Partido</h1>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {wsConnected ? (
-            <><Wifi className="h-3.5 w-3.5 text-green-500" /><span className="text-green-600">En vivo</span></>
-          ) : (
-            <><WifiOff className="h-3.5 w-3.5 text-red-500" /><span className="text-red-600">Sin conexion</span></>
+        <div className="flex items-center gap-2">
+          {canManageMatch && (
+            <Button size="sm" variant="destructive" onClick={handleDeleteMatch}>
+              <Trash2 className="h-4 w-4 mr-1" />Eliminar
+            </Button>
           )}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {wsConnected ? (
+              <><Wifi className="h-3.5 w-3.5 text-green-500" /><span className="text-green-600">En vivo</span></>
+            ) : (
+              <><WifiOff className="h-3.5 w-3.5 text-red-500" /><span className="text-red-600">Sin conexion</span></>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Blocked players warning */}
+      {blockedPlayerIds.size > 0 && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
+          <ShieldBan className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-red-800">Jugadores sancionados en este partido:</p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {[...playersA, ...playersB].filter(p => blockedPlayerIds.has(p.id)).map(p => (
+                <Badge key={p.id} variant="destructive" className="text-xs">
+                  #{p.jerseyNumber || "?"} {p.firstName} {p.lastName}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Scoreboard */}
       <Card className="mb-6">
@@ -258,6 +365,11 @@ export default function MatchDetailPage() {
                 {statusLabels[s]?.label || s}
               </Button>
             ))}
+            {canManageMatch && match.status === "FINISHED" && (
+              <Button size="sm" variant="outline" onClick={openEditFinishedMatch}>
+                <Edit className="h-4 w-4 mr-2" />Editar Marcador
+              </Button>
+            )}
             <Dialog open={rescheduleOpen} onOpenChange={setRescheduleOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" variant="outline">
@@ -296,10 +408,43 @@ export default function MatchDetailPage() {
         </CardContent>
       </Card>
 
+      {/* Edit finished match dialog */}
+      <Dialog open={editMatchOpen} onOpenChange={setEditMatchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Marcador</DialogTitle>
+            <DialogDescription>Corrige el marcador de un partido finalizado.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{teamAName} (Local)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editMatchForm.scoreA}
+                  onChange={(e) => setEditMatchForm(prev => ({ ...prev, scoreA: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{teamBName} (Visitante)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={editMatchForm.scoreB}
+                  onChange={(e) => setEditMatchForm(prev => ({ ...prev, scoreB: e.target.value }))}
+                />
+              </div>
+            </div>
+            <Button onClick={handleEditFinishedMatch} className="w-full">Guardar Cambios</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Events timeline + Add event button */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Eventos del Partido</h2>
-        {match.status !== "FINISHED" && match.status !== "CANCELLED" && (
+        {canManageEvents && match.status !== "CANCELLED" && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-2" />Agregar Evento</Button>
@@ -340,7 +485,8 @@ export default function MatchDetailPage() {
                     <SelectContent>
                       {selectedTeamPlayers.map((p: any) => (
                         <SelectItem key={p.id} value={p.id}>
-                          #{p.jerseyNumber || "?"} {p.firstName} {p.lastName}
+                          {blockedPlayerIds.has(p.id) ? "🚫 " : ""}#{p.jerseyNumber || "?"} {p.firstName} {p.lastName}
+                          {blockedPlayerIds.has(p.id) ? " (SANCIONADO)" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -391,6 +537,11 @@ export default function MatchDetailPage() {
                       <p className="text-xs text-muted-foreground">{isTeamA ? teamAName : teamBName}</p>
                       {event.description && <p className="text-xs text-muted-foreground italic">{event.description}</p>}
                     </div>
+                    {canDeleteEvents && (
+                      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => handleDeleteEvent(event.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" />
+                      </Button>
+                    )}
                   </div>
                 );
               })}
@@ -423,6 +574,7 @@ export default function MatchDetailPage() {
                   {match.playerStats.map((ps: any) => (
                     <tr key={ps.id} className="border-b hover:bg-muted/50">
                       <td className="py-2 px-2 font-medium">
+                        {blockedPlayerIds.has(ps.playerId) && <ShieldAlert className="h-3.5 w-3.5 text-red-500 inline mr-1" />}
                         #{ps.player?.jerseyNumber || "?"} {ps.player?.firstName} {ps.player?.lastName}
                       </td>
                       <td className="text-center py-2 px-1">{ps.goals || 0}</td>

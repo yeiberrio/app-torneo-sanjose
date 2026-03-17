@@ -1,4 +1,4 @@
-import { IsOptional, IsInt, IsDateString, IsEnum, Min, Max } from 'class-validator';
+import { IsOptional, IsInt, IsDateString, IsEnum, IsString, Min, Max } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum FixtureLegs {
@@ -33,4 +33,9 @@ export class GenerateFixtureDto {
   @ApiPropertyOptional({ description: 'Sede por defecto' })
   @IsOptional()
   defaultVenue?: string;
+
+  @ApiPropertyOptional({ description: 'ID de la ronda para generar fixture' })
+  @IsOptional()
+  @IsString()
+  roundId?: string;
 }

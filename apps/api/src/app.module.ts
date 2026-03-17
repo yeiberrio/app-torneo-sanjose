@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -13,11 +15,16 @@ import { StatisticsModule } from './statistics/statistics.module';
 import { CaslModule } from './casl/casl.module';
 import { SanctionsModule } from './sanctions/sanctions.module';
 import { NewsModule } from './news/news.module';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'uploads'),
+      serveRoot: '/uploads',
+    }),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -30,6 +37,7 @@ import { NewsModule } from './news/news.module';
     CaslModule,
     SanctionsModule,
     NewsModule,
+    UploadsModule,
   ],
 })
 export class AppModule {}

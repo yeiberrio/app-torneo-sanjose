@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { PlayersService } from './players.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
@@ -48,5 +48,14 @@ export class PlayersController {
   @ApiOperation({ summary: 'Actualizar jugador' })
   update(@Param('id') id: string, @Body() dto: Partial<CreatePlayerDto>) {
     return this.playersService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Player' })
+  @ApiOperation({ summary: 'Eliminar jugador' })
+  delete(@Param('id') id: string) {
+    return this.playersService.delete(id);
   }
 }

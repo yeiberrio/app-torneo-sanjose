@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { MatchesService } from './matches.service';
 import { CreateMatchDto } from './dto/create-match.dto';
@@ -66,5 +66,23 @@ export class MatchesController {
     @CurrentUser('id') userId: string,
   ) {
     return this.matchesService.addEvent(id, dto, userId);
+  }
+
+  @Delete(':id/events/:eventId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'MatchEvent' })
+  @ApiOperation({ summary: 'Eliminar evento del partido' })
+  deleteEvent(@Param('eventId') eventId: string) {
+    return this.matchesService.deleteEvent(eventId);
+  }
+
+  @Delete(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Match' })
+  @ApiOperation({ summary: 'Eliminar partido' })
+  deleteMatch(@Param('id') id: string) {
+    return this.matchesService.deleteMatch(id);
   }
 }
