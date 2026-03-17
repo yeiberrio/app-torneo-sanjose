@@ -86,77 +86,88 @@ export class MatchesService {
   }
 
   async addEvent(matchId: string, dto: CreateMatchEventDto, userId: string) {
-    // Clean empty/falsy playerId to avoid FK violation
-    const playerId = dto.playerId && dto.playerId.trim() !== '' ? dto.playerId : undefined;
+    try {
+      // Clean empty/falsy playerId to avoid FK violation
+      const playerId = dto.playerId && dto.playerId.trim() !== '' ? dto.playerId : undefined;
 
-    // Check if player is blocked by active sanctions
-    if (playerId) {
-      const matchData = await this.prisma.match.findUnique({
-        where: { id: matchId },
-        select: { tournamentId: true, teamAId: true, teamBId: true, scoreA: true, scoreB: true },
-      });
-      if (matchData) {
-        const playerSanctions = await this.sanctionsService.getActiveSanctions(playerId, matchData.tournamentId);
-        if (playerSanctions.length > 0) {
-          if (['GOAL', 'PENALTY_SCORED', 'SUBSTITUTION_IN'].includes(dto.type)) {
-            const reasons = playerSanctions.map(s => s.reason).join('; ');
-            throw new BadRequestException(
-              `Jugador inhabilitado: ${reasons}. No puede participar activamente en el partido.`
-            );
+      console.log('[addEvent] matchId:', matchId, 'dto:', JSON.stringify(dto), 'userId:', userId, 'cleanPlayerId:', playerId);
+
+      // Check if player is blocked by active sanctions
+      if (playerId) {
+        const matchData = await this.prisma.match.findUnique({
+          where: { id: matchId },
+          select: { tournamentId: true, teamAId: true, teamBId: true, scoreA: true, scoreB: true },
+        });
+        if (matchData) {
+          const playerSanctions = await this.sanctionsService.getActiveSanctions(playerId, matchData.tournamentId);
+          if (playerSanctions.length > 0) {
+            if (['GOAL', 'PENALTY_SCORED', 'SUBSTITUTION_IN'].includes(dto.type)) {
+              const reasons = playerSanctions.map(s => s.reason).join('; ');
+              throw new BadRequestException(
+                `Jugador inhabilitado: ${reasons}. No puede participar activamente en el partido.`
+              );
+            }
           }
         }
       }
-    }
 
-    // Build data explicitly to avoid sending unknown fields to Prisma
-    const eventData: any = {
-      matchId,
-      teamId: dto.teamId,
-      type: dto.type,
-      createdBy: userId,
-    };
-    if (playerId) eventData.playerId = playerId;
-    if (dto.minute !== undefined && dto.minute !== null) eventData.minute = Number(dto.minute);
-    if (dto.description) eventData.description = dto.description;
+      // Build data explicitly to avoid sending unknown fields to Prisma
+      const eventData: any = {
+        matchId,
+        teamId: dto.teamId,
+        type: dto.type,
+        createdBy: userId,
+      };
+      if (playerId) eventData.playerId = playerId;
+      if (dto.minute !== undefined && dto.minute !== null) eventData.minute = Number(dto.minute);
+      if (dto.description) eventData.description = dto.description;
 
-    const event = await this.prisma.matchEvent.create({ data: eventData });
+      console.log('[addEvent] creating event with data:', JSON.stringify(eventData));
 
-    // Update match score if it's a goal
-    if (['GOAL', 'PENALTY_SCORED'].includes(dto.type)) {
-      const match = await this.prisma.match.findUnique({ where: { id: matchId } });
-      if (match) {
-        const newScoreA = dto.teamId === match.teamAId ? (match.scoreA || 0) + 1 : (match.scoreA || 0);
-        const newScoreB = dto.teamId === match.teamBId ? (match.scoreB || 0) + 1 : (match.scoreB || 0);
-        await this.prisma.match.update({ where: { id: matchId }, data: { scoreA: newScoreA, scoreB: newScoreB } });
-        this.matchesGateway.emitScoreUpdate(matchId, newScoreA, newScoreB);
+      const event = await this.prisma.matchEvent.create({ data: eventData });
+
+      // Update match score if it's a goal
+      if (['GOAL', 'PENALTY_SCORED'].includes(dto.type)) {
+        const match = await this.prisma.match.findUnique({ where: { id: matchId } });
+        if (match) {
+          const newScoreA = dto.teamId === match.teamAId ? (match.scoreA || 0) + 1 : (match.scoreA || 0);
+          const newScoreB = dto.teamId === match.teamBId ? (match.scoreB || 0) + 1 : (match.scoreB || 0);
+          await this.prisma.match.update({ where: { id: matchId }, data: { scoreA: newScoreA, scoreB: newScoreB } });
+          this.matchesGateway.emitScoreUpdate(matchId, newScoreA, newScoreB);
+        }
       }
-    }
 
-    if (dto.type === 'OWN_GOAL') {
-      const match = await this.prisma.match.findUnique({ where: { id: matchId } });
-      if (match) {
-        // Own goal scores for the other team
-        const newScoreA = dto.teamId === match.teamAId ? (match.scoreA || 0) : (match.scoreA || 0) + 1;
-        const newScoreB = dto.teamId === match.teamBId ? (match.scoreB || 0) : (match.scoreB || 0) + 1;
-        await this.prisma.match.update({ where: { id: matchId }, data: { scoreA: newScoreA, scoreB: newScoreB } });
-        this.matchesGateway.emitScoreUpdate(matchId, newScoreA, newScoreB);
+      if (dto.type === 'OWN_GOAL') {
+        const match = await this.prisma.match.findUnique({ where: { id: matchId } });
+        if (match) {
+          const newScoreA = dto.teamId === match.teamAId ? (match.scoreA || 0) : (match.scoreA || 0) + 1;
+          const newScoreB = dto.teamId === match.teamBId ? (match.scoreB || 0) : (match.scoreB || 0) + 1;
+          await this.prisma.match.update({ where: { id: matchId }, data: { scoreA: newScoreA, scoreB: newScoreB } });
+          this.matchesGateway.emitScoreUpdate(matchId, newScoreA, newScoreB);
+        }
       }
-    }
 
-    // Emit event via WebSocket
-    this.matchesGateway.emitMatchEvent(matchId, event);
+      // Emit event via WebSocket
+      this.matchesGateway.emitMatchEvent(matchId, event);
 
-    // Check for automatic sanctions on card events
-    if (['YELLOW_CARD', 'RED_CARD', 'YELLOW_RED_CARD'].includes(dto.type) && dto.playerId) {
-      const sanction = await this.sanctionsService.checkAndApplySanctions(
-        matchId, dto.playerId, dto.type, userId,
-      );
-      if (sanction) {
-        return { event, sanction };
+      // Check for automatic sanctions on card events
+      if (['YELLOW_CARD', 'RED_CARD', 'YELLOW_RED_CARD'].includes(dto.type) && playerId) {
+        const sanction = await this.sanctionsService.checkAndApplySanctions(
+          matchId, playerId, dto.type, userId,
+        );
+        if (sanction) {
+          return { event, sanction };
+        }
       }
-    }
 
-    return event;
+      return event;
+    } catch (error) {
+      console.error('[addEvent] ERROR:', error?.message, error?.stack);
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException(`Error al registrar evento: ${error?.message || 'Error desconocido'}`);
+    }
   }
 
   async deleteEvent(eventId: string) {
