@@ -34,14 +34,20 @@ export class MatchesGateway {
   }
 
   emitMatchEvent(matchId: string, event: any) {
-    this.server.to(`match:${matchId}`).emit('matchEvent', event);
+    if (this.server) {
+      this.server.to(`match:${matchId}`).emit('matchEvent', event);
+    }
   }
 
   emitScoreUpdate(matchId: string, scoreA: number, scoreB: number) {
-    this.server.to(`match:${matchId}`).emit('scoreUpdate', { scoreA, scoreB });
+    if (this.server) {
+      this.server.to(`match:${matchId}`).emit('scoreUpdate', { scoreA, scoreB });
+    }
   }
 
   emitStatusUpdate(matchId: string, status: string) {
-    this.server.to(`match:${matchId}`).emit('statusUpdate', { status });
+    if (this.server) {
+      this.server.to(`match:${matchId}`).emit('statusUpdate', { status });
+    }
   }
 }

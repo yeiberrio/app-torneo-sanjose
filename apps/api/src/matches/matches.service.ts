@@ -86,6 +86,11 @@ export class MatchesService {
   }
 
   async addEvent(matchId: string, dto: CreateMatchEventDto, userId: string) {
+    // Clean empty playerId to avoid FK violation
+    if (dto.playerId === '') {
+      dto.playerId = undefined;
+    }
+
     // Check if player is blocked by active sanctions
     if (dto.playerId) {
       const matchData = await this.prisma.match.findUnique({
