@@ -41,37 +41,37 @@ export default function LoginPage() {
           <div className="absolute top-1/4 right-0 w-40 h-[120%] bg-gradient-to-b from-green-500/5 via-green-400/8 to-transparent -rotate-12 blur-2xl" />
         </div>
 
-        {/* Player composition - layered like FIFA cover */}
+        {/* Player composition - layered like FIFA cover (NATIONAL TEAM jerseys) */}
         <div className="absolute inset-0 flex items-end justify-center">
-          {/* Messi - far left */}
+          {/* Messi (Argentina) - far left */}
           <div className="absolute left-0 bottom-0 w-[32%] h-[70%] z-10">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg/440px-Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg" alt="Messi" className="w-full h-full object-cover object-top opacity-60" />
+            <img src="https://www.footyrenders.com/render/MESSI-3.png" alt="Messi - Argentina" className="w-full h-full object-contain object-bottom opacity-60" />
             <div className="absolute inset-0 bg-gradient-to-r from-[#0b0f1a]/90 via-transparent to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/70" />
           </div>
 
-          {/* Cristiano - far right */}
+          {/* Cristiano (Portugal) - far right */}
           <div className="absolute right-0 bottom-0 w-[32%] h-[70%] z-10">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cristiano_Ronaldo_2018.jpg/440px-Cristiano_Ronaldo_2018.jpg" alt="Cristiano Ronaldo" className="w-full h-full object-cover object-top opacity-60" />
+            <img src="https://www.footyrenders.com/render/cristiano-ronaldo-473.png" alt="Cristiano Ronaldo - Portugal" className="w-full h-full object-contain object-bottom opacity-60" />
             <div className="absolute inset-0 bg-gradient-to-l from-[#0b0f1a]/90 via-transparent to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/70" />
           </div>
 
-          {/* Mbappé - left mid */}
+          {/* Mbappé (France) - left mid */}
           <div className="absolute left-[12%] bottom-0 w-[28%] h-[80%] z-20">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg/440px-2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg" alt="Mbappé" className="w-full h-full object-cover object-top opacity-75" />
+            <img src="https://www.footyrenders.com/render/kylian-mbappe-155.png" alt="Mbappé - France" className="w-full h-full object-contain object-bottom opacity-75" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/50" />
           </div>
 
-          {/* Vinícius - right mid */}
+          {/* Vinícius (Brazil) - right mid */}
           <div className="absolute right-[12%] bottom-0 w-[28%] h-[80%] z-20">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Vin%C3%ADcius_J%C3%BAnior_2024.jpg/440px-Vin%C3%ADcius_J%C3%BAnior_2024.jpg" alt="Vinícius Jr" className="w-full h-full object-cover object-top opacity-75" />
+            <img src="https://www.footyrenders.com/render/vinicius-junior-92.png" alt="Vinícius Jr - Brazil" className="w-full h-full object-contain object-bottom opacity-75" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/50" />
           </div>
 
-          {/* LUIS DÍAZ - CENTER HERO */}
+          {/* LUIS DÍAZ (Colombia) - CENTER HERO */}
           <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[48%] h-[92%] z-30">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Luis_D%C3%ADaz_2024_%28cropped%29.jpg/440px-Luis_D%C3%ADaz_2024_%28cropped%29.jpg" alt="Luis Díaz" className="w-full h-full object-cover object-top" />
+            <img src="https://www.footyrenders.com/render/luis-diaz-14.png" alt="Luis Díaz - Colombia" className="w-full h-full object-contain object-bottom" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-transparent" />
           </div>
         </div>

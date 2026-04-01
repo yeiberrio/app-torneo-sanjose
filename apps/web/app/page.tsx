@@ -10,37 +10,37 @@ const worldStars = [
     name: "Luis Díaz",
     team: "Colombia",
     pos: "Extremo",
-    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Luis_D%C3%ADaz_2024_%28cropped%29.jpg/440px-Luis_D%C3%ADaz_2024_%28cropped%29.jpg",
+    img: "https://www.footyrenders.com/render/luis-diaz-14.png",
   },
   {
     name: "James Rodríguez",
     team: "Colombia",
     pos: "Mediocampista",
-    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/James_Rodriguez_2024.jpg/440px-James_Rodriguez_2024.jpg",
+    img: "https://www.footyrenders.com/render/James-Rodriguez-52.png",
   },
   {
     name: "Lionel Messi",
     team: "Argentina",
     pos: "Delantero",
-    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg/440px-Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg",
+    img: "https://www.footyrenders.com/render/MESSI-3.png",
   },
   {
     name: "Cristiano Ronaldo",
     team: "Portugal",
     pos: "Delantero",
-    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cristiano_Ronaldo_2018.jpg/440px-Cristiano_Ronaldo_2018.jpg",
+    img: "https://www.footyrenders.com/render/cristiano-ronaldo-473.png",
   },
   {
     name: "Kylian Mbappé",
     team: "Francia",
     pos: "Delantero",
-    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg/440px-2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg",
+    img: "https://www.footyrenders.com/render/kylian-mbappe-155.png",
   },
   {
     name: "Vinícius Jr.",
     team: "Brasil",
     pos: "Extremo",
-    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Vin%C3%ADcius_J%C3%BAnior_2024.jpg/440px-Vin%C3%ADcius_J%C3%BAnior_2024.jpg",
+    img: "https://www.footyrenders.com/render/vinicius-junior-92.png",
   },
 ];
 
