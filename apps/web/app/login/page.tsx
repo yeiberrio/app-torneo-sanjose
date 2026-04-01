@@ -29,81 +29,65 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel - Player collage with Luis Díaz as hero */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-[#0a1628]">
-        {/* Stadium ambient background */}
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-20"
-          style={{ backgroundImage: `url('https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1200&q=80')` }}
-        />
+      {/* Left panel - FIFA-style player cover */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-[#0b0f1a]">
+        {/* Dark radial background */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_#1a2744_0%,_#0b0f1a_70%)]" />
 
-        {/* Player grid: Luis Díaz center + stars around */}
-        <div className="absolute inset-0 flex flex-col">
-          {/* Top row - 3 players */}
-          <div className="flex h-[35%]">
-            <div className="w-1/3 relative overflow-hidden border-r border-b border-white/5">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg/440px-Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg" alt="Messi" className="w-full h-full object-cover object-top" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <span className="absolute bottom-2 left-2 text-[10px] font-bold text-white/80 bg-blue-500/60 px-1.5 py-0.5 rounded">ARG</span>
-            </div>
-            <div className="w-1/3 relative overflow-hidden border-r border-b border-white/5">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cristiano_Ronaldo_2018.jpg/440px-Cristiano_Ronaldo_2018.jpg" alt="Cristiano" className="w-full h-full object-cover object-top" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <span className="absolute bottom-2 left-2 text-[10px] font-bold text-white/80 bg-red-600/60 px-1.5 py-0.5 rounded">POR</span>
-            </div>
-            <div className="w-1/3 relative overflow-hidden border-b border-white/5">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg/440px-2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg" alt="Mbappé" className="w-full h-full object-cover object-top" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <span className="absolute bottom-2 left-2 text-[10px] font-bold text-white/80 bg-blue-700/60 px-1.5 py-0.5 rounded">FRA</span>
-            </div>
+        {/* Decorative circles (EA FC style) */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-20 -left-20 w-[600px] h-[600px] border border-white/[0.03] rounded-full" />
+          <div className="absolute -top-40 -left-40 w-[900px] h-[900px] border border-white/[0.02] rounded-full" />
+          <div className="absolute top-1/4 right-0 w-40 h-[120%] bg-gradient-to-b from-green-500/5 via-green-400/8 to-transparent -rotate-12 blur-2xl" />
+        </div>
+
+        {/* Player composition - layered like FIFA cover */}
+        <div className="absolute inset-0 flex items-end justify-center">
+          {/* Messi - far left */}
+          <div className="absolute left-0 bottom-0 w-[32%] h-[70%] z-10">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg/440px-Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg" alt="Messi" className="w-full h-full object-cover object-top opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0b0f1a]/90 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/70" />
           </div>
 
-          {/* Center - LUIS DÍAZ hero (biggest) */}
-          <div className="h-[40%] relative overflow-hidden border-b border-white/5">
+          {/* Cristiano - far right */}
+          <div className="absolute right-0 bottom-0 w-[32%] h-[70%] z-10">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cristiano_Ronaldo_2018.jpg/440px-Cristiano_Ronaldo_2018.jpg" alt="Cristiano Ronaldo" className="w-full h-full object-cover object-top opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-l from-[#0b0f1a]/90 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/70" />
+          </div>
+
+          {/* Mbappé - left mid */}
+          <div className="absolute left-[12%] bottom-0 w-[28%] h-[80%] z-20">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg/440px-2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg" alt="Mbappé" className="w-full h-full object-cover object-top opacity-75" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/50" />
+          </div>
+
+          {/* Vinícius - right mid */}
+          <div className="absolute right-[12%] bottom-0 w-[28%] h-[80%] z-20">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Vin%C3%ADcius_J%C3%BAnior_2024.jpg/440px-Vin%C3%ADcius_J%C3%BAnior_2024.jpg" alt="Vinícius Jr" className="w-full h-full object-cover object-top opacity-75" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/50" />
+          </div>
+
+          {/* LUIS DÍAZ - CENTER HERO */}
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[48%] h-[92%] z-30">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Luis_D%C3%ADaz_2024_%28cropped%29.jpg/440px-Luis_D%C3%ADaz_2024_%28cropped%29.jpg" alt="Luis Díaz" className="w-full h-full object-cover object-top" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 via-transparent to-red-500/10" />
-            {/* Colombia flag bar */}
-            <div className="absolute top-0 left-0 right-0 h-1 flex">
-              <div className="flex-[2] bg-yellow-400" />
-              <div className="flex-1 bg-blue-600" />
-              <div className="flex-1 bg-red-600" />
-            </div>
-          </div>
-
-          {/* Bottom row - 3 players */}
-          <div className="flex h-[25%]">
-            <div className="w-1/3 relative overflow-hidden border-r border-white/5">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Vin%C3%ADcius_J%C3%BAnior_2024.jpg/440px-Vin%C3%ADcius_J%C3%BAnior_2024.jpg" alt="Vinícius Jr" className="w-full h-full object-cover object-top" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <span className="absolute bottom-2 left-2 text-[10px] font-bold text-white/80 bg-green-600/60 px-1.5 py-0.5 rounded">BRA</span>
-            </div>
-            <div className="w-1/3 relative overflow-hidden border-r border-white/5">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/James_Rodriguez_2024.jpg/440px-James_Rodriguez_2024.jpg" alt="James Rodríguez" className="w-full h-full object-cover object-top" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <span className="absolute bottom-2 left-2 text-[10px] font-bold text-white/80 bg-yellow-500/60 px-1.5 py-0.5 rounded">COL</span>
-            </div>
-            <div className="w-1/3 relative overflow-hidden">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Erling_Haaland_2023_%28cropped%29.jpg/440px-Erling_Haaland_2023_%28cropped%29.jpg" alt="Haaland" className="w-full h-full object-cover object-top" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-              <span className="absolute bottom-2 left-2 text-[10px] font-bold text-white/80 bg-red-500/60 px-1.5 py-0.5 rounded">NOR</span>
-            </div>
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-transparent" />
           </div>
         </div>
 
-        {/* Overlay gradients for blending */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#0a1628]/60 pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-transparent to-[#0a1628]/40 pointer-events-none" />
+        {/* Top fade */}
+        <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-[#0b0f1a] to-transparent pointer-events-none z-30" />
 
         {/* Bottom branding */}
-        <div className="absolute bottom-0 left-0 right-0 p-8 z-10">
-          <div className="flex items-center gap-3 mb-3">
+        <div className="absolute bottom-0 left-0 right-0 p-8 z-40 bg-gradient-to-t from-[#0b0f1a] via-[#0b0f1a]/90 to-transparent pt-24">
+          <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30">
               <Trophy className="h-5 w-5 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">SportManager Pro</h2>
-              <p className="text-green-400 text-xs">Mundial 2026 - La fiesta del futbol</p>
+              <p className="text-green-400 text-xs">Mundial 2026</p>
             </div>
           </div>
         </div>
@@ -111,7 +95,6 @@ export default function LoginPage() {
 
       {/* Right panel - Form */}
       <div className="flex-1 flex items-center justify-center bg-[#0a1628] px-6 py-12 relative">
-        {/* Subtle pattern */}
         <div className="absolute inset-0 opacity-[0.02]"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
