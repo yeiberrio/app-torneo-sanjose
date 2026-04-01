@@ -10,13 +10,6 @@ import { Trophy } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
-const playerImages = [
-  { src: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Luis_D%C3%ADaz_2024_%28cropped%29.jpg/440px-Luis_D%C3%ADaz_2024_%28cropped%29.jpg", name: "Luis Díaz" },
-  { src: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg/440px-Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg", name: "Messi" },
-  { src: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cristiano_Ronaldo_2018.jpg/440px-Cristiano_Ronaldo_2018.jpg", name: "CR7" },
-  { src: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg/440px-2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg", name: "Mbappé" },
-];
-
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,35 +29,20 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel - Player collage */}
+      {/* Left panel - World Cup image */}
       <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
-        {/* Stadium background */}
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1200&q=80')`,
+            backgroundImage: `url('https://digitalhub.fifa.com/transform/fa98a88a-62fa-4264-83e8-e4b7ef517791/FIFA26-Emblem-4col_Vert-3?io=transform:fill,width:1200&quality=75')`,
           }}
         />
-        <div className="absolute inset-0 bg-[#0a1628]/70" />
-
-        {/* Player photos grid */}
-        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 p-1 opacity-40">
-          {playerImages.map((p) => (
-            <div key={p.name} className="relative overflow-hidden">
-              <img
-                src={p.src}
-                alt={p.name}
-                className="w-full h-full object-cover object-top"
-              />
-            </div>
-          ))}
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#0a1628]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-[#0a1628]/40 to-[#0a1628]/60" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-[#0a1628]/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#0a1628]/50" />
 
         {/* Content overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-12 z-10">
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-4">
             <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30">
               <Trophy className="h-6 w-6 text-white" />
             </div>
@@ -73,25 +51,13 @@ export default function LoginPage() {
               <p className="text-green-400 text-sm">Torneo Futbol 7 San Jose 2026</p>
             </div>
           </div>
-          <p className="text-white/50 text-sm max-w-sm leading-relaxed">
+          <p className="text-white/60 text-sm max-w-sm leading-relaxed">
             La pasion del futbol se vive en cada partido.
             Gestiona torneos con las herramientas mas completas.
           </p>
 
-          {/* Player name badges */}
-          <div className="flex gap-2 mt-6 flex-wrap">
-            {["Luis Díaz", "James", "Messi", "CR7", "Mbappé", "Vinícius"].map((name) => (
-              <span
-                key={name}
-                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-xs text-white/70 font-medium"
-              >
-                {name}
-              </span>
-            ))}
-          </div>
-
           {/* Colombia flag stripe */}
-          <div className="flex mt-8 rounded-lg overflow-hidden h-1.5 max-w-xs">
+          <div className="flex mt-6 rounded-lg overflow-hidden h-1.5 max-w-xs">
             <div className="flex-[2] bg-yellow-400" />
             <div className="flex-1 bg-blue-600" />
             <div className="flex-1 bg-red-600" />
