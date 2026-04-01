@@ -5,11 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Newspaper } from "lucide-react";
+import { Plus, Newspaper, RefreshCw } from "lucide-react";
 import api from "@/lib/api";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { can } from "@/lib/permissions";
+import { toast } from "sonner";
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   DRAFT: { label: "Borrador", className: "bg-yellow-100 text-yellow-800" },
@@ -31,15 +32,34 @@ export default function NewsPage() {
   const canCreate = user ? can(user.role, "create", "News") : false;
   const [news, setNews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scraping, setScraping] = useState(false);
   const [statusFilter, setStatusFilter] = useState("ALL");
 
-  useEffect(() => {
+  const loadNews = () => {
+    setLoading(true);
     const params = new URLSearchParams({ limit: "50" });
     if (statusFilter !== "ALL") params.set("status", statusFilter);
     api.get(`/news?${params.toString()}`).then((res) => {
       setNews(res.data.data || []);
     }).catch(() => {}).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadNews();
   }, [statusFilter]);
+
+  const handleScrape = async () => {
+    setScraping(true);
+    try {
+      const res = await api.post("/news/scrape");
+      toast.success(`${res.data.created} noticias mundialistas importadas`);
+      loadNews();
+    } catch {
+      toast.error("Error al importar noticias");
+    } finally {
+      setScraping(false);
+    }
+  };
 
   return (
     <div>
@@ -58,6 +78,12 @@ export default function NewsPage() {
                 <SelectItem value="ARCHIVED">Archivadas</SelectItem>
               </SelectContent>
             </Select>
+          )}
+          {canCreate && (
+            <Button variant="outline" onClick={handleScrape} disabled={scraping}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${scraping ? "animate-spin" : ""}`} />
+              {scraping ? "Importando..." : "Noticias Mundial"}
+            </Button>
           )}
           {canCreate && (
             <Button asChild>

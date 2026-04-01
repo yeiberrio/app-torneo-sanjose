@@ -10,6 +10,13 @@ import { Trophy } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
+const playerImages = [
+  { src: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Luis_D%C3%ADaz_2024_%28cropped%29.jpg/440px-Luis_D%C3%ADaz_2024_%28cropped%29.jpg", name: "Luis Díaz" },
+  { src: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg/440px-Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg", name: "Messi" },
+  { src: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cristiano_Ronaldo_2018.jpg/440px-Cristiano_Ronaldo_2018.jpg", name: "CR7" },
+  { src: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg/440px-2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg", name: "Mbappé" },
+];
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,18 +36,33 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel - Image */}
-      <div className="hidden lg:flex lg:w-1/2 relative">
+      {/* Left panel - Player collage */}
+      <div className="hidden lg:block lg:w-1/2 relative overflow-hidden">
+        {/* Stadium background */}
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=1200&q=80')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1200&q=80')`,
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a1628]/60 to-[#0a1628]/90" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[#0a1628]/70" />
 
-        {/* Decorative accent */}
+        {/* Player photos grid */}
+        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 p-1 opacity-40">
+          {playerImages.map((p) => (
+            <div key={p.name} className="relative overflow-hidden">
+              <img
+                src={p.src}
+                alt={p.name}
+                className="w-full h-full object-cover object-top"
+              />
+            </div>
+          ))}
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#0a1628]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-[#0a1628]/40 to-[#0a1628]/60" />
+
+        {/* Content overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-12 z-10">
           <div className="flex items-center gap-3 mb-6">
             <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-500/30">
@@ -52,30 +74,37 @@ export default function LoginPage() {
             </div>
           </div>
           <p className="text-white/50 text-sm max-w-sm leading-relaxed">
-            La pasion del futbol se vive en cada partido. Gestiona torneos como un profesional
-            con las herramientas mas completas del mercado.
+            La pasion del futbol se vive en cada partido.
+            Gestiona torneos con las herramientas mas completas.
           </p>
 
-          {/* World Cup stars ticker */}
-          <div className="flex gap-3 mt-6 flex-wrap">
+          {/* Player name badges */}
+          <div className="flex gap-2 mt-6 flex-wrap">
             {["Luis Díaz", "James", "Messi", "CR7", "Mbappé", "Vinícius"].map((name) => (
               <span
                 key={name}
-                className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-full px-3 py-1 text-xs text-white/60"
+                className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-xs text-white/70 font-medium"
               >
                 {name}
               </span>
             ))}
+          </div>
+
+          {/* Colombia flag stripe */}
+          <div className="flex mt-8 rounded-lg overflow-hidden h-1.5 max-w-xs">
+            <div className="flex-[2] bg-yellow-400" />
+            <div className="flex-1 bg-blue-600" />
+            <div className="flex-1 bg-red-600" />
           </div>
         </div>
       </div>
 
       {/* Right panel - Form */}
       <div className="flex-1 flex items-center justify-center bg-[#0a1628] px-6 py-12 relative">
-        {/* Subtle background pattern */}
-        <div className="absolute inset-0 opacity-[0.03]"
+        {/* Subtle pattern */}
+        <div className="absolute inset-0 opacity-[0.02]"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }}
         />
 
@@ -92,7 +121,6 @@ export default function LoginPage() {
         </div>
 
         <div className="w-full max-w-md relative z-10">
-          {/* Back to landing */}
           <Link href="/" className="hidden lg:inline-flex items-center gap-1 text-sm text-white/40 hover:text-white/70 mb-8 transition-colors">
             ← Volver al inicio
           </Link>
@@ -143,10 +171,9 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          {/* Decorative footer */}
           <div className="mt-12 pt-6 border-t border-white/5 flex items-center justify-center gap-2">
             <div className="h-1.5 w-1.5 rounded-full bg-green-400" />
-            <p className="text-xs text-white/20">SportManager Pro - Futbol 7</p>
+            <p className="text-xs text-white/20">SportManager Pro - Mundial 2026</p>
             <div className="h-1.5 w-1.5 rounded-full bg-green-400" />
           </div>
         </div>

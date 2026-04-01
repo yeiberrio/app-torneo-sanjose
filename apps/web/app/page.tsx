@@ -1,16 +1,47 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Trophy, Users, Swords, BarChart3, ChevronRight, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const stars = [
-  { name: "Luis Díaz", team: "Colombia", pos: "Extremo" },
-  { name: "James Rodríguez", team: "Colombia", pos: "Mediocampista" },
-  { name: "Cristiano Ronaldo", team: "Portugal", pos: "Delantero" },
-  { name: "Lionel Messi", team: "Argentina", pos: "Delantero" },
-  { name: "Kylian Mbappé", team: "Francia", pos: "Delantero" },
-  { name: "Vinícius Jr.", team: "Brasil", pos: "Extremo" },
+const worldStars = [
+  {
+    name: "Luis Díaz",
+    team: "Colombia",
+    pos: "Extremo",
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Luis_D%C3%ADaz_2024_%28cropped%29.jpg/440px-Luis_D%C3%ADaz_2024_%28cropped%29.jpg",
+  },
+  {
+    name: "James Rodríguez",
+    team: "Colombia",
+    pos: "Mediocampista",
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/79/James_Rodriguez_2024.jpg/440px-James_Rodriguez_2024.jpg",
+  },
+  {
+    name: "Lionel Messi",
+    team: "Argentina",
+    pos: "Delantero",
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg/440px-Lionel-Messi-Argentina-2022-FIFA-World-Cup_%28cropped%29.jpg",
+  },
+  {
+    name: "Cristiano Ronaldo",
+    team: "Portugal",
+    pos: "Delantero",
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8c/Cristiano_Ronaldo_2018.jpg/440px-Cristiano_Ronaldo_2018.jpg",
+  },
+  {
+    name: "Kylian Mbappé",
+    team: "Francia",
+    pos: "Delantero",
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg/440px-2019-07-17_SG_Dynamo_Dresden_vs._Paris_Saint-Germain_by_Sandro_Halank%E2%80%93129_%28cropped%29.jpg",
+  },
+  {
+    name: "Vinícius Jr.",
+    team: "Brasil",
+    pos: "Extremo",
+    img: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Vin%C3%ADcius_J%C3%BAnior_2024.jpg/440px-Vin%C3%ADcius_J%C3%BAnior_2024.jpg",
+  },
 ];
 
 const features = [
@@ -23,21 +54,19 @@ const features = [
 export default function Home() {
   return (
     <div className="min-h-screen bg-[#0a1628] text-white overflow-hidden">
-      {/* Hero Section */}
+      {/* Hero Section with World Cup stadium background */}
       <div className="relative min-h-screen flex items-center">
-        {/* Background image with overlay */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=1920&q=80')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1540747913346-19e32dc3e97e?w=1920&q=80')`,
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a1628]/95 via-[#0a1628]/80 to-[#0a1628]/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0a1628]/95 via-[#0a1628]/75 to-[#0a1628]/40" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-transparent to-transparent" />
 
-        {/* Animated accent lines */}
+        {/* Decorative accent */}
         <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-green-400 via-yellow-400 to-green-400 opacity-60" />
-        <div className="absolute top-0 left-3 w-0.5 h-full bg-gradient-to-b from-yellow-400 via-green-400 to-yellow-400 opacity-30" />
 
         {/* Nav */}
         <nav className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 md:px-12 py-5">
@@ -63,7 +92,7 @@ export default function Home() {
         <div className="relative z-10 px-6 md:px-12 max-w-3xl">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5 mb-6">
             <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-sm text-green-300 font-medium">Mundial 2026 - Se viene la fiesta del futbol</span>
+            <span className="text-sm text-green-300 font-medium">Mundial 2026 - USA, Mexico & Canada</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-black leading-[0.9] mb-6">
@@ -111,43 +140,84 @@ export default function Home() {
         </div>
       </div>
 
-      {/* World Stars Section */}
-      <section className="relative py-20 px-6 md:px-12 bg-gradient-to-b from-[#0a1628] to-[#0d1f3c]">
+      {/* World Stars Section - with REAL PHOTOS */}
+      <section className="relative py-24 px-6 md:px-12 bg-gradient-to-b from-[#0a1628] to-[#0d1f3c]">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 mb-2">
-            <Star className="h-5 w-5 text-yellow-400" />
-            <span className="text-sm font-semibold text-yellow-400 uppercase tracking-wider">Inspirados en los mejores</span>
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 mb-4">
+              <Star className="h-5 w-5 text-yellow-400" />
+              <span className="text-sm font-semibold text-yellow-400 uppercase tracking-wider">Estrellas Mundialistas</span>
+              <Star className="h-5 w-5 text-yellow-400" />
+            </div>
+            <h2 className="text-4xl md:text-5xl font-black mb-4">
+              Las figuras del <span className="bg-gradient-to-r from-yellow-400 to-yellow-200 bg-clip-text text-transparent">Mundial 2026</span>
+            </h2>
+            <p className="text-white/40 max-w-lg mx-auto">
+              Inspirados en los mejores del mundo. El futbol se vive con pasion.
+            </p>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-12">
-            Estrellas del <span className="text-green-400">Mundial 2026</span>
-          </h2>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {stars.map((star) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5">
+            {worldStars.map((star) => (
               <div
                 key={star.name}
-                className="group relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:bg-white/10 hover:border-green-400/30 transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-green-500/10"
+                className="group relative bg-gradient-to-b from-white/10 to-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden hover:border-green-400/40 transition-all hover:-translate-y-2 hover:shadow-2xl hover:shadow-green-500/10"
               >
-                <div className="h-12 w-12 rounded-full bg-gradient-to-br from-green-400/20 to-yellow-400/20 flex items-center justify-center mb-3 group-hover:from-green-400/30 group-hover:to-yellow-400/30 transition-all">
-                  <span className="text-lg font-bold text-green-400">{star.name.split(" ").map(n => n[0]).join("")}</span>
+                {/* Player photo */}
+                <div className="relative h-48 overflow-hidden">
+                  <img
+                    src={star.img}
+                    alt={star.name}
+                    className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0a1628] via-transparent to-transparent" />
+                  {/* Country flag accent */}
+                  <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm rounded-full px-2 py-0.5">
+                    <span className="text-[10px] font-bold text-white/80">{star.team}</span>
+                  </div>
                 </div>
-                <p className="font-bold text-sm text-white">{star.name}</p>
-                <p className="text-xs text-white/40 mt-1">{star.team}</p>
-                <p className="text-xs text-green-400/60">{star.pos}</p>
+                {/* Info */}
+                <div className="p-4 relative">
+                  <p className="font-bold text-sm text-white group-hover:text-green-400 transition-colors">{star.name}</p>
+                  <p className="text-xs text-green-400/60 mt-1">{star.pos}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="relative py-20 px-6 md:px-12">
+      {/* Banner - Colombia World Cup */}
+      <section className="relative py-16 overflow-hidden">
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-5"
+          className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=1920&q=80')`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1518604666860-9ed391f76460?w=1920&q=80')`,
           }}
         />
+        <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/80 via-blue-700/80 to-red-600/80" />
+        <div className="relative z-10 max-w-4xl mx-auto text-center px-6">
+          <h3 className="text-3xl md:text-4xl font-black mb-3">VAMOS COLOMBIA!</h3>
+          <p className="text-white/90 text-lg">La Tricolor suena fuerte rumbo al Mundial 2026</p>
+          <div className="flex justify-center gap-6 mt-6">
+            <div className="text-center">
+              <p className="text-4xl font-black">10</p>
+              <p className="text-xs text-white/60 uppercase">James</p>
+            </div>
+            <div className="text-center">
+              <p className="text-4xl font-black">7</p>
+              <p className="text-xs text-white/60 uppercase">Luis Díaz</p>
+            </div>
+            <div className="text-center">
+              <p className="text-4xl font-black">9</p>
+              <p className="text-xs text-white/60 uppercase">Duván Zapata</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="relative py-20 px-6 md:px-12 bg-[#0a1628]">
         <div className="relative max-w-6xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-4">
             Todo lo que necesitas
@@ -176,9 +246,7 @@ export default function Home() {
       {/* CTA Section */}
       <section className="relative py-20 px-6 md:px-12">
         <div className="max-w-4xl mx-auto text-center">
-          <div
-            className="relative rounded-3xl overflow-hidden p-12 md:p-16"
-          >
+          <div className="relative rounded-3xl overflow-hidden p-12 md:p-16">
             <div
               className="absolute inset-0 bg-cover bg-center"
               style={{

@@ -3,6 +3,7 @@ import {
   UseGuards, Request,
 } from '@nestjs/common';
 import { NewsService } from './news.service';
+import { NewsScraperService } from './news-scraper.service';
 import { CreateNewsDto } from './dto/create-news.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PoliciesGuard } from '../casl/policies.guard';
@@ -11,7 +12,10 @@ import { NewsStatus } from '@prisma/client';
 
 @Controller('news')
 export class NewsController {
-  constructor(private newsService: NewsService) {}
+  constructor(
+    private newsService: NewsService,
+    private newsScraperService: NewsScraperService,
+  ) {}
 
   @Get()
   findAll(
@@ -66,5 +70,12 @@ export class NewsController {
   @CheckPolicies({ action: 'delete', subject: 'News' })
   delete(@Param('id') id: string) {
     return this.newsService.delete(id);
+  }
+
+  @Post('scrape')
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'create', subject: 'News' })
+  scrape() {
+    return this.newsScraperService.scrapeNews();
   }
 }

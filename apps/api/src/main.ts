@@ -38,5 +38,16 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port, '0.0.0.0');
   console.log(`API running on port ${port}`);
+
+  // Auto-scrape news on startup and every 12 hours
+  try {
+    const { NewsScraperService } = await import('./news/news-scraper.service');
+    const scraper = app.get(NewsScraperService);
+    scraper.scrapeNews().catch(() => {});
+    setInterval(() => scraper.scrapeNews().catch(() => {}), 12 * 60 * 60 * 1000);
+    console.log('News scraper scheduled (every 12h)');
+  } catch (e) {
+    console.warn('News scraper init skipped:', (e as Error).message);
+  }
 }
 bootstrap();
