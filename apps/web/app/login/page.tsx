@@ -45,33 +45,33 @@ export default function LoginPage() {
         <div className="absolute inset-0 flex items-end justify-center">
           {/* Messi (Argentina) - far left */}
           <div className="absolute left-0 bottom-0 w-[32%] h-[70%] z-10">
-            <img src="https://www.footyrenders.com/render/MESSI-3.png" alt="Messi - Argentina" className="w-full h-full object-contain object-bottom opacity-60" />
+            <img src="https://r2.thesportsdb.com/images/media/player/render/3dlkuh1691420623.png" alt="Messi" className="w-full h-full object-contain object-bottom opacity-60" />
             <div className="absolute inset-0 bg-gradient-to-r from-[#0b0f1a]/90 via-transparent to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/70" />
           </div>
 
           {/* Cristiano (Portugal) - far right */}
           <div className="absolute right-0 bottom-0 w-[32%] h-[70%] z-10">
-            <img src="https://www.footyrenders.com/render/cristiano-ronaldo-473.png" alt="Cristiano Ronaldo - Portugal" className="w-full h-full object-contain object-bottom opacity-60" />
+            <img src="https://r2.thesportsdb.com/images/media/player/render/5iwvee1741981685.png" alt="Cristiano Ronaldo" className="w-full h-full object-contain object-bottom opacity-60" />
             <div className="absolute inset-0 bg-gradient-to-l from-[#0b0f1a]/90 via-transparent to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/70" />
           </div>
 
           {/* Mbappé (France) - left mid */}
           <div className="absolute left-[12%] bottom-0 w-[28%] h-[80%] z-20">
-            <img src="https://www.footyrenders.com/render/kylian-mbappe-155.png" alt="Mbappé - France" className="w-full h-full object-contain object-bottom opacity-75" />
+            <img src="https://r2.thesportsdb.com/images/media/player/render/4eikfb1723707377.png" alt="Mbappé" className="w-full h-full object-contain object-bottom opacity-75" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/50" />
           </div>
 
           {/* Vinícius (Brazil) - right mid */}
           <div className="absolute right-[12%] bottom-0 w-[28%] h-[80%] z-20">
-            <img src="https://www.footyrenders.com/render/vinicius-junior-92.png" alt="Vinícius Jr - Brazil" className="w-full h-full object-contain object-bottom opacity-75" />
+            <img src="https://r2.thesportsdb.com/images/media/player/render/73s1nu1751450397.png" alt="Vinícius Jr" className="w-full h-full object-contain object-bottom opacity-75" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-[#0b0f1a]/50" />
           </div>
 
           {/* LUIS DÍAZ (Colombia) - CENTER HERO */}
           <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[48%] h-[92%] z-30">
-            <img src="https://www.footyrenders.com/render/luis-diaz-14.png" alt="Luis Díaz - Colombia" className="w-full h-full object-contain object-bottom" />
+            <img src="https://r2.thesportsdb.com/images/media/player/render/yxu5001735806350.png" alt="Luis Díaz" className="w-full h-full object-contain object-bottom" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f1a] via-transparent to-transparent" />
           </div>
         </div>

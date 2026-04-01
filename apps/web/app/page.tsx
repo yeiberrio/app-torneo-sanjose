@@ -10,37 +10,37 @@ const worldStars = [
     name: "Luis Díaz",
     team: "Colombia",
     pos: "Extremo",
-    img: "https://www.footyrenders.com/render/luis-diaz-14.png",
+    img: "https://r2.thesportsdb.com/images/media/player/render/yxu5001735806350.png",
   },
   {
     name: "James Rodríguez",
     team: "Colombia",
     pos: "Mediocampista",
-    img: "https://www.footyrenders.com/render/James-Rodriguez-52.png",
+    img: "https://r2.thesportsdb.com/images/media/player/render/2yqe201572387259.png",
   },
   {
     name: "Lionel Messi",
     team: "Argentina",
     pos: "Delantero",
-    img: "https://www.footyrenders.com/render/MESSI-3.png",
+    img: "https://r2.thesportsdb.com/images/media/player/render/3dlkuh1691420623.png",
   },
   {
     name: "Cristiano Ronaldo",
     team: "Portugal",
     pos: "Delantero",
-    img: "https://www.footyrenders.com/render/cristiano-ronaldo-473.png",
+    img: "https://r2.thesportsdb.com/images/media/player/render/5iwvee1741981685.png",
   },
   {
     name: "Kylian Mbappé",
     team: "Francia",
     pos: "Delantero",
-    img: "https://www.footyrenders.com/render/kylian-mbappe-155.png",
+    img: "https://r2.thesportsdb.com/images/media/player/render/4eikfb1723707377.png",
   },
   {
     name: "Vinícius Jr.",
     team: "Brasil",
     pos: "Extremo",
-    img: "https://www.footyrenders.com/render/vinicius-junior-92.png",
+    img: "https://r2.thesportsdb.com/images/media/player/render/73s1nu1751450397.png",
   },
 ];
 
