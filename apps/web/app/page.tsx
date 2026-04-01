@@ -121,22 +121,6 @@ export default function Home() {
               <Link href="/register">Crear cuenta gratis</Link>
             </Button>
           </div>
-
-          {/* Quick stats */}
-          <div className="flex gap-8 mt-12 pt-8 border-t border-white/10">
-            <div>
-              <p className="text-3xl font-bold text-green-400">17</p>
-              <p className="text-sm text-white/40">Equipos</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-yellow-400">268</p>
-              <p className="text-sm text-white/40">Jugadores</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-white">136</p>
-              <p className="text-sm text-white/40">Partidos</p>
-            </div>
-          </div>
         </div>
       </div>
 
