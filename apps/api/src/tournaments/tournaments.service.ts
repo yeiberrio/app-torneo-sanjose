@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTournamentDto } from './dto/create-tournament.dto';
 import { UpdateTournamentDto } from './dto/update-tournament.dto';
 import { GenerateFixtureDto } from './dto/generate-fixture.dto';
 import { CreateRoundDto } from './dto/create-round.dto';
 import { ConfigureTiebreakersDto } from './dto/configure-tiebreakers.dto';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class TournamentsService {
@@ -18,13 +19,15 @@ export class TournamentsService {
 
   async findAll(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
+    const where = { deletedAt: null };
     const [data, total] = await Promise.all([
       this.prisma.tournament.findMany({
+        where,
         skip, take: limit,
         include: { _count: { select: { teams: true, matches: true } } },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.tournament.count(),
+      this.prisma.tournament.count({ where }),
     ]);
     return { data, total, page, limit };
   }
@@ -406,6 +409,50 @@ export class TournamentsService {
     return this.prisma.tournamentTiebreaker.findMany({
       where: { tournamentId, roundId: roundId || null },
       orderBy: { priority: 'asc' },
+    });
+  }
+
+  // --- Soft Delete (Papelera) ---
+  async softDelete(id: string, password: string, userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('Usuario no encontrado');
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) throw new UnauthorizedException('Contraseña incorrecta');
+
+    const tournament = await this.prisma.tournament.findUnique({ where: { id } });
+    if (!tournament) throw new NotFoundException('Torneo no encontrado');
+    if (tournament.deletedAt) throw new BadRequestException('El torneo ya está en la papelera');
+
+    return this.prisma.tournament.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedBy: userId },
+    });
+  }
+
+  async findTrashed(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where = { deletedAt: { not: null } };
+    const [data, total] = await Promise.all([
+      this.prisma.tournament.findMany({
+        where,
+        skip, take: limit,
+        include: { _count: { select: { teams: true, matches: true } } },
+        orderBy: { deletedAt: 'desc' },
+      }),
+      this.prisma.tournament.count({ where }),
+    ]);
+    return { data, total, page, limit };
+  }
+
+  async restore(id: string) {
+    const tournament = await this.prisma.tournament.findUnique({ where: { id } });
+    if (!tournament) throw new NotFoundException('Torneo no encontrado');
+    if (!tournament.deletedAt) throw new BadRequestException('El torneo no está en la papelera');
+
+    return this.prisma.tournament.update({
+      where: { id },
+      data: { deletedAt: null, deletedBy: null },
     });
   }
 

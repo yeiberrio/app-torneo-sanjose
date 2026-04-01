@@ -21,6 +21,15 @@ export class TournamentsController {
     return this.tournamentsService.findAll(Number(page) || 1, Number(limit) || 20);
   }
 
+  @Get('trash/list')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Listar torneos en papelera' })
+  findTrashed(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.tournamentsService.findTrashed(Number(page) || 1, Number(limit) || 20);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Ver torneo por ID' })
   findById(@Param('id') id: string) {
@@ -142,5 +151,23 @@ export class TournamentsController {
   @ApiOperation({ summary: 'Agregar equipo a torneo en curso (genera partidos adicionales)' })
   addTeamMidTournament(@Param('id') id: string, @Param('teamId') teamId: string, @Body('groupName') groupName?: string) {
     return this.tournamentsService.addTeamMidTournament(id, teamId, groupName);
+  }
+
+  @Delete(':id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Eliminar torneo (mover a papelera, requiere contraseña)' })
+  softDelete(@Param('id') id: string, @Body('password') password: string, @CurrentUser('id') userId: string) {
+    return this.tournamentsService.softDelete(id, password, userId);
+  }
+
+  @Post(':id/restore')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Restaurar torneo de la papelera' })
+  restore(@Param('id') id: string) {
+    return this.tournamentsService.restore(id);
   }
 }

@@ -284,6 +284,8 @@ model Tournament {
   drawPoints       Int              @default(1)
   lossPoints       Int              @default(0)
   maxYellowCards   Int              @default(3)
+  deletedAt        DateTime?
+  deletedBy        String?
   createdAt        DateTime         @default(now())
 
   teams            TournamentTeam[]
