@@ -137,7 +137,19 @@ export default function NewsDetailPage() {
             <p className="text-lg text-muted-foreground mb-4 italic">{news.summary}</p>
           )}
           <div className="prose prose-sm max-w-none whitespace-pre-wrap">
-            {news.content}
+            {news.content.split('\n').map((line: string, i: number) => {
+              const urlMatch = line.match(/^Leer mas:\s*(https?:\/\/.+)$/);
+              if (urlMatch) {
+                return (
+                  <p key={i}>
+                    <a href={urlMatch[1]} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
+                      Leer articulo completo →
+                    </a>
+                  </p>
+                );
+              }
+              return <span key={i}>{line}{'\n'}</span>;
+            })}
           </div>
         </CardContent>
       </Card>

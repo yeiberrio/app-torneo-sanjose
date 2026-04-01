@@ -182,19 +182,35 @@ export class NewsScraperService {
       .trim();
   }
 
+  private extractRealUrl(item: RssParser.Item): string | null {
+    // Google News RSS includes the real source URL inside the <a> tags in content
+    const content = item.content || '';
+    const hrefMatch = content.match(/<a[^>]+href="(https?:\/\/(?!news\.google\.com)[^"]+)"/);
+    if (hrefMatch) return hrefMatch[1];
+
+    // If the link is not a Google News redirect, use it directly
+    const link = item.link || '';
+    if (link && !link.includes('news.google.com/rss/articles')) return link;
+
+    return null;
+  }
+
   private buildContent(item: RssParser.Item, sourceName: string): string {
     const snippet = this.cleanContent(item.contentSnippet || item.content || '');
-    const link = item.link || '';
+    const realUrl = this.extractRealUrl(item);
     const date = item.pubDate
       ? new Date(item.pubDate).toLocaleDateString('es-CO', { dateStyle: 'long' })
       : '';
 
+    // Extract source name from the snippet (Google News often appends it)
+    const sourceFromContent = item.contentSnippet?.match(/([^.]+)$/)?.[0]?.trim();
+
     return [
       snippet,
       '',
-      `Fuente: ${sourceName}`,
+      `Fuente: ${sourceFromContent || sourceName}`,
       date ? `Fecha: ${date}` : '',
-      link ? `Leer mas: ${link}` : '',
+      realUrl ? `Leer mas: ${realUrl}` : '',
     ].filter(Boolean).join('\n');
   }
 
