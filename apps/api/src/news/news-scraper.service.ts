@@ -140,6 +140,13 @@ export class NewsScraperService {
             continue;
           }
 
+          // Skip news without any URL
+          const articleUrl = this.extractUrl(item);
+          if (!articleUrl) {
+            skipped++;
+            continue;
+          }
+
           const summary = this.cleanContent(item.contentSnippet || item.content || '');
           const content = this.buildContent(item, source.name);
           const imageUrl = this.extractImage(item, source.group);
@@ -182,22 +189,25 @@ export class NewsScraperService {
       .trim();
   }
 
-  private extractRealUrl(item: RssParser.Item): string | null {
-    // Google News RSS includes the real source URL inside the <a> tags in content
+  private extractUrl(item: RssParser.Item): string {
+    // 1. Try to get real source URL from HTML content (Google News embeds it)
     const content = item.content || '';
-    const hrefMatch = content.match(/<a[^>]+href="(https?:\/\/(?!news\.google\.com)[^"]+)"/);
-    if (hrefMatch) return hrefMatch[1];
+    const allHrefs = [...content.matchAll(/<a[^>]+href="(https?:\/\/[^"]+)"/g)].map(m => m[1]);
+    const realUrl = allHrefs.find(url => !url.includes('news.google.com'));
+    if (realUrl) return realUrl;
 
-    // If the link is not a Google News redirect, use it directly
-    const link = item.link || '';
-    if (link && !link.includes('news.google.com/rss/articles')) return link;
+    // 2. Use item.link directly - Google News redirect URLs still work in browser
+    if (item.link) return item.link;
 
-    return null;
+    // 3. Check guid
+    if ((item as any).guid && (item as any).guid.startsWith('http')) return (item as any).guid;
+
+    return '';
   }
 
   private buildContent(item: RssParser.Item, sourceName: string): string {
     const snippet = this.cleanContent(item.contentSnippet || item.content || '');
-    const realUrl = this.extractRealUrl(item);
+    const url = this.extractUrl(item);
     const date = item.pubDate
       ? new Date(item.pubDate).toLocaleDateString('es-CO', { dateStyle: 'long' })
       : '';
@@ -210,7 +220,7 @@ export class NewsScraperService {
       '',
       `Fuente: ${sourceFromContent || sourceName}`,
       date ? `Fecha: ${date}` : '',
-      realUrl ? `Leer mas: ${realUrl}` : '',
+      url ? `Leer mas: ${url}` : '',
     ].filter(Boolean).join('\n');
   }
 

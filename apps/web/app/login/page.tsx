@@ -69,10 +69,6 @@ export default function LoginPage() {
               <div className="flex-1 bg-blue-600" />
               <div className="flex-1 bg-red-600" />
             </div>
-            <div className="absolute bottom-4 left-5 right-5">
-              <p className="text-2xl font-black text-white tracking-tight">LUIS DÍAZ</p>
-              <p className="text-sm text-yellow-400 font-semibold">Colombia | #7</p>
-            </div>
           </div>
 
           {/* Bottom row - 3 players */}
