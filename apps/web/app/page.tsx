@@ -92,7 +92,7 @@ export default function Home() {
         <div className="relative z-10 px-6 md:px-12 max-w-3xl">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/10 rounded-full px-4 py-1.5 mb-6">
             <span className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-sm text-green-300 font-medium">Mundial 2026 - USA, Mexico & Canada</span>
+            <span className="text-sm text-green-300 font-medium">Torneo Futbol 7 San Jose 2026</span>
           </div>
 
           <h1 className="text-5xl md:text-7xl font-black leading-[0.9] mb-6">
@@ -134,7 +134,7 @@ export default function Home() {
               <Star className="h-5 w-5 text-yellow-400" />
             </div>
             <h2 className="text-4xl md:text-5xl font-black mb-4">
-              Las figuras del <span className="bg-gradient-to-r from-yellow-400 to-yellow-200 bg-clip-text text-transparent">Mundial 2026</span>
+              Las figuras del <span className="bg-gradient-to-r from-yellow-400 to-yellow-200 bg-clip-text text-transparent">Torneo San Jose</span>
             </h2>
             <p className="text-white/40 max-w-lg mx-auto">
               Inspirados en los mejores del mundo. El futbol se vive con pasion.
@@ -182,7 +182,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/80 via-blue-700/80 to-red-600/80" />
         <div className="relative z-10 max-w-4xl mx-auto text-center px-6">
           <h3 className="text-3xl md:text-4xl font-black mb-3">VAMOS COLOMBIA!</h3>
-          <p className="text-white/90 text-lg">La Tricolor suena fuerte rumbo al Mundial 2026</p>
+          <p className="text-white/90 text-lg">La Tricolor suena fuerte rumbo al Torneo Futbol 7 San Jose 2026</p>
           <div className="flex justify-center gap-6 mt-6">
             <div className="text-center">
               <p className="text-4xl font-black">10</p>

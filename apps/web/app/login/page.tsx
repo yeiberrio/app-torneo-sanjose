@@ -87,7 +87,7 @@ export default function LoginPage() {
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">SportManager Pro</h2>
-              <p className="text-green-400 text-xs">Mundial 2026</p>
+              <p className="text-green-400 text-xs">Torneo Futbol 7 San Jose 2026</p>
             </div>
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function LoginPage() {
 
           <div className="mt-12 pt-6 border-t border-white/5 flex items-center justify-center gap-2">
             <div className="h-1.5 w-1.5 rounded-full bg-green-400" />
-            <p className="text-xs text-white/20">SportManager Pro - Mundial 2026</p>
+            <p className="text-xs text-white/20">SportManager Pro - Torneo Futbol 7 San Jose</p>
             <div className="h-1.5 w-1.5 rounded-full bg-green-400" />
           </div>
         </div>
