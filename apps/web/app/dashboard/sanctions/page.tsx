@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertTriangle, ShieldCheck, Unlock, Plus, RefreshCw, CheckCircle, Clock } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Unlock, Plus, RefreshCw, CheckCircle, Clock, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
@@ -44,6 +44,10 @@ export default function SanctionsPage() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState("active");
+
+  // Filters
+  const [sanctionSearch, setSanctionSearch] = useState("");
+  const [filterSanctionType, setFilterSanctionType] = useState<string>("all");
 
   // Unlock dialog state
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
@@ -192,6 +196,23 @@ export default function SanctionsPage() {
 
   const inactiveSanctions = allSanctions.filter(s => !s.isActive);
 
+  // Apply search/type filters
+  const filterSanction = (s: any) => {
+    if (sanctionSearch.trim()) {
+      const q = sanctionSearch.toLowerCase();
+      const name = `${s.player?.firstName || ""} ${s.player?.lastName || ""}`.toLowerCase();
+      const team = (s.player?.team?.name || "").toLowerCase();
+      if (!name.includes(q) && !team.includes(q)) return false;
+    }
+    if (filterSanctionType !== "all" && s.type !== filterSanctionType) return false;
+    return true;
+  };
+
+  const filteredActive = useMemo(() => sanctions.filter(filterSanction), [sanctions, sanctionSearch, filterSanctionType]);
+  const filteredInactive = useMemo(() => inactiveSanctions.filter(filterSanction), [inactiveSanctions, sanctionSearch, filterSanctionType]);
+  const hasSanctionFilters = sanctionSearch.trim() !== "" || filterSanctionType !== "all";
+  const clearSanctionFilters = () => { setSanctionSearch(""); setFilterSanctionType("all"); };
+
   const renderSanctionCard = (s: any, showActions = true) => (
     <Card key={s.id} className={!s.isActive ? "opacity-60" : ""}>
       <CardContent className="p-4">
@@ -281,22 +302,43 @@ export default function SanctionsPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="active">
-            Activas ({sanctions.length})
+            Activas ({filteredActive.length})
           </TabsTrigger>
           <TabsTrigger value="history">
-            Historial ({inactiveSanctions.length})
+            Historial ({filteredInactive.length})
           </TabsTrigger>
         </TabsList>
+
+        {/* Search & type filter */}
+        {(sanctions.length > 0 || inactiveSanctions.length > 0) && (
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input placeholder="Buscar jugador o equipo..." value={sanctionSearch} onChange={(e) => setSanctionSearch(e.target.value)} className="pl-9" />
+            </div>
+            <Select value={filterSanctionType} onValueChange={setFilterSanctionType}>
+              <SelectTrigger className="w-[200px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los tipos</SelectItem>
+                {Object.entries(sanctionTypeLabels).map(([k, v]) => (<SelectItem key={k} value={k}>{v}</SelectItem>))}
+              </SelectContent>
+            </Select>
+            {hasSanctionFilters && (
+              <Button size="sm" variant="ghost" onClick={clearSanctionFilters}><X className="h-4 w-4 mr-1" />Limpiar</Button>
+            )}
+          </div>
+        )}
 
         <TabsContent value="active">
           {loading ? (
             <p className="text-muted-foreground">Cargando...</p>
-          ) : sanctions.length === 0 ? (
+          ) : filteredActive.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
                 <ShieldCheck className="h-12 w-12 mx-auto text-green-500 mb-4" />
-                <p className="text-muted-foreground">No hay sanciones activas.</p>
-                {canManage && (
+                <p className="text-muted-foreground">{hasSanctionFilters ? "No se encontraron sanciones con los filtros aplicados." : "No hay sanciones activas."}</p>
+                {hasSanctionFilters && <Button variant="outline" size="sm" className="mt-2" onClick={clearSanctionFilters}>Limpiar filtros</Button>}
+                {!hasSanctionFilters && canManage && (
                   <p className="text-xs text-muted-foreground mt-2">
                     Usa "Auto-procesar" para verificar si hay sanciones cumplidas pendientes de desbloquear.
                   </p>
@@ -305,21 +347,22 @@ export default function SanctionsPage() {
             </Card>
           ) : (
             <div className="space-y-3">
-              {sanctions.map((s) => renderSanctionCard(s, true))}
+              {filteredActive.map((s) => renderSanctionCard(s, true))}
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="history">
-          {inactiveSanctions.length === 0 ? (
+          {filteredInactive.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
-                <p className="text-muted-foreground">No hay sanciones cumplidas en el historial.</p>
+                <p className="text-muted-foreground">{hasSanctionFilters ? "No se encontraron sanciones con los filtros aplicados." : "No hay sanciones cumplidas en el historial."}</p>
+                {hasSanctionFilters && <Button variant="outline" size="sm" className="mt-2" onClick={clearSanctionFilters}>Limpiar filtros</Button>}
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-3">
-              {inactiveSanctions.map((s) => renderSanctionCard(s, false))}
+              {filteredInactive.map((s) => renderSanctionCard(s, false))}
             </div>
           )}
         </TabsContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Users, ChevronRight, Edit, Trash2, Upload } from "lucide-react";
+import { Plus, Users, ChevronRight, Edit, Trash2, Upload, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -36,6 +36,9 @@ export default function TeamsPage() {
   // Delete confirmation dialog state
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Filters
+  const [searchText, setSearchText] = useState("");
 
   // Logo upload state
   const [logoTeamId, setLogoTeamId] = useState<string | null>(null);
@@ -163,6 +166,26 @@ export default function TeamsPage() {
       {/* Hidden file input for logo upload */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
 
+      {/* Search */}
+      {!loading && teams.length > 0 && (
+        <div className="mb-4 flex items-center gap-2">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar equipo por nombre o ciudad..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="pl-9" />
+          </div>
+          {searchText && (
+            <Button size="sm" variant="ghost" onClick={() => setSearchText("")}><X className="h-4 w-4 mr-1" />Limpiar</Button>
+          )}
+          <span className="text-xs text-muted-foreground ml-auto">
+            {teams.filter(t => {
+              if (!searchText.trim()) return true;
+              const q = searchText.toLowerCase();
+              return t.name.toLowerCase().includes(q) || (t.city || "").toLowerCase().includes(q);
+            }).length} de {teams.length}
+          </span>
+        </div>
+      )}
+
       {loading ? (
         <p className="text-muted-foreground">Cargando...</p>
       ) : teams.length === 0 ? (
@@ -174,7 +197,11 @@ export default function TeamsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {teams.map((team) => (
+          {teams.filter(t => {
+            if (!searchText.trim()) return true;
+            const q = searchText.toLowerCase();
+            return t.name.toLowerCase().includes(q) || (t.city || "").toLowerCase().includes(q);
+          }).map((team) => (
             <a key={team.id} href={`/dashboard/teams/detalle?id=${team.id}`} style={{ textDecoration: "none", color: "inherit" }}>
               <Card className="hover:shadow-md transition-shadow cursor-pointer">
                 <CardContent className="p-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Edit, Users } from "lucide-react";
+import { Plus, Trash2, Edit, Users, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -49,6 +49,12 @@ export default function PlayersPage() {
   // Delete confirmation dialog state
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Filters
+  const [searchText, setSearchText] = useState("");
+  const [filterPosition, setFilterPosition] = useState<string>("all");
+  const [filterTeam, setFilterTeam] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
 
   const fetchPlayers = () => {
     api.get("/players").then((res) => {
@@ -105,9 +111,35 @@ export default function PlayersPage() {
     }
   };
 
+  // Derived data
+  const teamNames = useMemo(() => {
+    const names = new Set<string>();
+    players.forEach(p => { if (p.team?.name) names.add(p.team.name); });
+    return Array.from(names).sort();
+  }, [players]);
+
+  const filteredPlayers = useMemo(() => {
+    let result = players;
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      result = result.filter(p =>
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
+        (p.team?.name || "").toLowerCase().includes(q) ||
+        String(p.jerseyNumber || "").includes(q)
+      );
+    }
+    if (filterPosition !== "all") result = result.filter(p => p.position === filterPosition);
+    if (filterTeam !== "all") result = result.filter(p => p.team?.name === filterTeam);
+    if (filterStatus !== "all") result = result.filter(p => p.status === filterStatus);
+    return result;
+  }, [players, searchText, filterPosition, filterTeam, filterStatus]);
+
+  const hasActiveFilters = searchText.trim() !== "" || filterPosition !== "all" || filterTeam !== "all" || filterStatus !== "all";
+  const clearFilters = () => { setSearchText(""); setFilterPosition("all"); setFilterTeam("all"); setFilterStatus("all"); };
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Jugadores</h1>
         <div className="flex gap-2">
           {canDelete && (
@@ -122,6 +154,50 @@ export default function PlayersPage() {
         </div>
       </div>
 
+      {/* Filters */}
+      {!loading && players.length > 0 && (
+        <Card className="mb-4">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar por nombre, equipo o #..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="pl-9" />
+              </div>
+              <Select value={filterPosition} onValueChange={setFilterPosition}>
+                <SelectTrigger className="w-[150px]"><SelectValue placeholder="Posicion" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las posiciones</SelectItem>
+                  {Object.entries(positionLabels).map(([k, v]) => (<SelectItem key={k} value={k}>{v}</SelectItem>))}
+                </SelectContent>
+              </Select>
+              {teamNames.length > 1 && (
+                <Select value={filterTeam} onValueChange={setFilterTeam}>
+                  <SelectTrigger className="w-[180px]"><SelectValue placeholder="Equipo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los equipos</SelectItem>
+                    {teamNames.map(t => (<SelectItem key={t} value={t}>{t}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[130px]"><SelectValue placeholder="Estado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="ACTIVE">Activo</SelectItem>
+                  <SelectItem value="SUSPENDED">Suspendido</SelectItem>
+                  <SelectItem value="INJURED">Lesionado</SelectItem>
+                  <SelectItem value="INACTIVE">Inactivo</SelectItem>
+                </SelectContent>
+              </Select>
+              {hasActiveFilters && (
+                <Button size="sm" variant="ghost" onClick={clearFilters}><X className="h-4 w-4 mr-1" />Limpiar</Button>
+              )}
+              <span className="text-xs text-muted-foreground ml-auto">{filteredPlayers.length} de {players.length}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {loading ? (
         <p className="text-muted-foreground">Cargando...</p>
       ) : players.length === 0 ? (
@@ -129,6 +205,13 @@ export default function PlayersPage() {
           <CardContent className="p-12 text-center">
             <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">No hay jugadores registrados.</p>
+          </CardContent>
+        </Card>
+      ) : filteredPlayers.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground">No se encontraron jugadores con los filtros aplicados.</p>
+            <Button variant="outline" size="sm" className="mt-2" onClick={clearFilters}>Limpiar filtros</Button>
           </CardContent>
         </Card>
       ) : (
@@ -145,7 +228,7 @@ export default function PlayersPage() {
               </tr>
             </thead>
             <tbody>
-              {players.map((p) => (
+              {filteredPlayers.map((p) => (
                 <tr key={p.id} className="border-b hover:bg-muted/50">
                   <td className="p-3">{p.jerseyNumber || "-"}</td>
                   <td className="p-3 font-medium">{p.firstName} {p.lastName}</td>
