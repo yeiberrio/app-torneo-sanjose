@@ -79,21 +79,47 @@ export default function PlayerDetailPage() {
   const sanctions = player.sanctions || [];
   const st = player.status ? statusLabels[player.status] : null;
 
-  // Aggregate totals
-  const totals = stats.reduce((acc: any, s: any) => ({
+  // Aggregate totals from events (real data) since MatchPlayerStat may not be populated
+  const eventCounts: Record<string, number> = {};
+  events.forEach((e: any) => { eventCounts[e.type] = (eventCounts[e.type] || 0) + 1; });
+
+  // Count unique matches from events
+  const matchIdsFromEvents = new Set<string>();
+  events.forEach((e: any) => { if (e.match?.id) matchIdsFromEvents.add(e.match.id); });
+  // Also count from stats
+  stats.forEach((s: any) => { if (s.match?.id) matchIdsFromEvents.add(s.match.id); });
+
+  // Use events as primary source for totals, fall back to stats aggregation
+  const statsAgg = stats.reduce((acc: any, s: any) => ({
     goals: acc.goals + (s.goals || 0),
-    ownGoals: acc.ownGoals + (s.ownGoals || 0),
     assists: acc.assists + (s.assists || 0),
     yellowCards: acc.yellowCards + (s.yellowCards || 0),
     redCards: acc.redCards + (s.redCards || 0),
     fouls: acc.fouls + (s.fouls || 0),
     minutesPlayed: acc.minutesPlayed + (s.minutesPlayed || 0),
-    matchesPlayed: acc.matchesPlayed + 1,
-  }), { goals: 0, ownGoals: 0, assists: 0, yellowCards: 0, redCards: 0, fouls: 0, minutesPlayed: 0, matchesPlayed: 0 });
+  }), { goals: 0, assists: 0, yellowCards: 0, redCards: 0, fouls: 0, minutesPlayed: 0 });
 
-  // Count events by type
-  const eventCounts: Record<string, number> = {};
-  events.forEach((e: any) => { eventCounts[e.type] = (eventCounts[e.type] || 0) + 1; });
+  const eventsGoals = (eventCounts["GOAL"] || 0) + (eventCounts["PENALTY_SCORED"] || 0);
+  const eventsYellow = eventCounts["YELLOW_CARD"] || 0;
+  const eventsBlue = eventCounts["BLUE_CARD"] || 0;
+  const eventsRed = (eventCounts["RED_CARD"] || 0) + (eventCounts["YELLOW_RED_CARD"] || 0);
+  const eventsFouls = eventCounts["FOUL"] || 0;
+  const eventsOwnGoals = eventCounts["OWN_GOAL"] || 0;
+
+  // Use whichever source has more data
+  const totals = {
+    matchesPlayed: Math.max(matchIdsFromEvents.size, stats.length),
+    goals: Math.max(eventsGoals, statsAgg.goals),
+    ownGoals: eventsOwnGoals,
+    assists: statsAgg.assists,
+    yellowCards: Math.max(eventsYellow, statsAgg.yellowCards),
+    blueCards: eventsBlue,
+    redCards: Math.max(eventsRed, statsAgg.redCards),
+    fouls: Math.max(eventsFouls, statsAgg.fouls),
+    minutesPlayed: statsAgg.minutesPlayed,
+    penaltyScored: eventCounts["PENALTY_SCORED"] || 0,
+    penaltyMissed: eventCounts["PENALTY_MISSED"] || 0,
+  };
 
   // Age calculation
   const age = player.birthDate ? Math.floor((Date.now() - new Date(player.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null;
@@ -171,16 +197,19 @@ export default function PlayerDetailPage() {
       </Card>
 
       {/* Stats summary */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3 mb-6">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-8 gap-3 mb-6">
         {[
           { label: "Partidos", value: totals.matchesPlayed, icon: "🏟️" },
           { label: "Goles", value: totals.goals, icon: "⚽" },
+          { label: "Autogoles", value: totals.ownGoals, icon: "⚽🔴", hide: totals.ownGoals === 0 },
           { label: "Asistencias", value: totals.assists, icon: "👟" },
           { label: "Amarillas", value: totals.yellowCards, icon: "🟨" },
+          { label: "Azules", value: totals.blueCards, icon: "🟦", hide: totals.blueCards === 0 },
           { label: "Rojas", value: totals.redCards, icon: "🟥" },
           { label: "Faltas", value: totals.fouls, icon: "⚠️" },
-          { label: "Minutos", value: totals.minutesPlayed, icon: "⏱️" },
-        ].map((stat) => (
+          { label: "Penales", value: `${totals.penaltyScored}/${totals.penaltyScored + totals.penaltyMissed}`, icon: "🎯", hide: totals.penaltyScored + totals.penaltyMissed === 0 },
+          { label: "Minutos", value: totals.minutesPlayed, icon: "⏱️", hide: totals.minutesPlayed === 0 },
+        ].filter(s => !s.hide).map((stat) => (
           <Card key={stat.label} className="animate-scale-in">
             <CardContent className="p-3 text-center">
               <p className="text-lg mb-0.5">{stat.icon}</p>
