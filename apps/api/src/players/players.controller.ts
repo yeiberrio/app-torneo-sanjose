@@ -5,6 +5,7 @@ import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PoliciesGuard, CheckPolicies } from '../casl/policies.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Players')
 @Controller('players')
@@ -25,6 +26,15 @@ export class PlayersController {
   @ApiOperation({ summary: 'Top goleadores del torneo' })
   getTopScorers(@Param('tournamentId') tournamentId: string, @Query('limit') limit?: string) {
     return this.playersService.getTopScorers(tournamentId, Number(limit) || 10);
+  }
+
+  @Get('trash/list')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Player' })
+  @ApiOperation({ summary: 'Listar jugadores en papelera' })
+  findTrashed(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.playersService.findTrashed(Number(page) || 1, Number(limit) || 20);
   }
 
   @Get(':id')
@@ -55,8 +65,17 @@ export class PlayersController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, PoliciesGuard)
   @CheckPolicies({ action: 'delete', subject: 'Player' })
-  @ApiOperation({ summary: 'Eliminar jugador' })
-  delete(@Param('id') id: string) {
-    return this.playersService.delete(id);
+  @ApiOperation({ summary: 'Eliminar jugador (mover a papelera)' })
+  softDelete(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.playersService.softDelete(id, userId);
+  }
+
+  @Post(':id/restore')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Player' })
+  @ApiOperation({ summary: 'Restaurar jugador de la papelera' })
+  restore(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.playersService.restore(id, userId);
   }
 }

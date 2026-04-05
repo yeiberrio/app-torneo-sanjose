@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
@@ -15,7 +15,8 @@ export class PlayersService {
 
   async findAll(teamId?: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
-    const where = teamId ? { teamId } : {};
+    const where: any = { deletedAt: null };
+    if (teamId) where.teamId = teamId;
     const [data, total] = await Promise.all([
       this.prisma.player.findMany({
         where, skip, take: limit,
@@ -50,16 +51,75 @@ export class PlayersService {
     });
   }
 
-  async delete(id: string) {
+  async softDelete(id: string, userId: string) {
+    const player = await this.prisma.player.findUnique({
+      where: { id },
+      include: { team: { select: { name: true } } },
+    });
+    if (!player) throw new NotFoundException('Jugador no encontrado');
+    if (player.deletedAt) throw new BadRequestException('El jugador ya esta en la papelera');
+
+    await this.prisma.player.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedBy: userId },
+    });
+
+    // Log audit
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'DELETE',
+        entity: 'Player',
+        entityId: id,
+        oldValue: {
+          firstName: player.firstName,
+          lastName: player.lastName,
+          jerseyNumber: player.jerseyNumber,
+          team: player.team?.name,
+        },
+      },
+    });
+
+    return { message: 'Jugador movido a la papelera' };
+  }
+
+  async findTrashed(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where = { deletedAt: { not: null } };
+    const [data, total] = await Promise.all([
+      this.prisma.player.findMany({
+        where: where as any,
+        skip, take: limit,
+        include: { team: { select: { id: true, name: true, logoUrl: true } } },
+        orderBy: { deletedAt: 'desc' },
+      }),
+      this.prisma.player.count({ where: where as any }),
+    ]);
+    return { data, total, page, limit };
+  }
+
+  async restore(id: string, userId: string) {
     const player = await this.prisma.player.findUnique({ where: { id } });
     if (!player) throw new NotFoundException('Jugador no encontrado');
+    if (!player.deletedAt) throw new BadRequestException('El jugador no esta en la papelera');
 
-    // Delete related data first
-    await this.prisma.matchEvent.deleteMany({ where: { playerId: id } });
-    await this.prisma.matchPlayerStat.deleteMany({ where: { playerId: id } });
-    await this.prisma.sanction.deleteMany({ where: { playerId: id } });
-    await this.prisma.player.delete({ where: { id } });
-    return { message: 'Jugador eliminado' };
+    await this.prisma.player.update({
+      where: { id },
+      data: { deletedAt: null, deletedBy: null },
+    });
+
+    // Log audit
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'RESTORE',
+        entity: 'Player',
+        entityId: id,
+        newValue: { firstName: player.firstName, lastName: player.lastName },
+      },
+    });
+
+    return { message: 'Jugador restaurado' };
   }
 
   async getTopScorers(tournamentId: string, limit = 10) {

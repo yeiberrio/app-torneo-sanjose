@@ -299,13 +299,15 @@ model Tournament {
 }
 
 model Team {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   logoUrl     String?
   city        String?
   foundedYear Int?
   directorId  String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+  deletedBy   String?
 
   players     Player[]
   tournaments TournamentTeam[]
@@ -348,6 +350,8 @@ model Player {
   sectorId         String?
   status           PlayerStatus    @default(ACTIVE)
   createdAt        DateTime        @default(now())
+  deletedAt        DateTime?
+  deletedBy        String?
 
   stats            MatchPlayerStat[]
   sanctions        Sanction[]

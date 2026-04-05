@@ -3,7 +3,14 @@
 import { useEffect, useState, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Users, ChevronRight, Edit, Trash2, Upload } from "lucide-react";
@@ -25,6 +32,10 @@ export default function TeamsPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editTeam, setEditTeam] = useState<any>(null);
   const [editForm, setEditForm] = useState({ name: "", city: "", foundedYear: "" });
+
+  // Delete confirmation dialog state
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Logo upload state
   const [logoTeamId, setLogoTeamId] = useState<string | null>(null);
@@ -71,16 +82,24 @@ export default function TeamsPage() {
     }
   };
 
-  const handleDelete = async (id: string, name: string, e: React.MouseEvent) => {
+  const openDeleteConfirm = (team: any, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!confirm(`¿Eliminar el equipo ${name}? Esta accion no se puede deshacer.`)) return;
+    setDeleteTarget(team);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await api.delete(`/teams/${id}`);
-      toast.success("Equipo eliminado");
-      setTeams((prev) => prev.filter((t) => t.id !== id));
+      await api.delete(`/teams/${deleteTarget.id}`);
+      toast.success(`Equipo "${deleteTarget.name}" movido a la papelera`);
+      setDeleteTarget(null);
+      fetchTeams();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al eliminar equipo");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -128,7 +147,17 @@ export default function TeamsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Equipos</h1>
-        {canCreate && <Button asChild><Link href="/dashboard/teams/new"><Plus className="h-4 w-4 mr-2" />Nuevo Equipo</Link></Button>}
+        <div className="flex gap-2">
+          {canDelete && (
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/teams/papelera">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Papelera
+              </Link>
+            </Button>
+          )}
+          {canCreate && <Button asChild><Link href="/dashboard/teams/new"><Plus className="h-4 w-4 mr-2" />Nuevo Equipo</Link></Button>}
+        </div>
       </div>
 
       {/* Hidden file input for logo upload */}
@@ -180,7 +209,7 @@ export default function TeamsPage() {
                         </Button>
                       )}
                       {canDelete && (
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => handleDelete(team.id, team.name, e)}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => openDeleteConfirm(team, e)}>
                           <Trash2 className="h-3.5 w-3.5 text-red-500" />
                         </Button>
                       )}
@@ -218,6 +247,27 @@ export default function TeamsPage() {
             </div>
             <Button onClick={handleEditSave} className="w-full">Guardar Cambios</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar equipo</DialogTitle>
+            <DialogDescription>
+              ¿Desea eliminar el equipo <strong>"{deleteTarget?.name}"</strong>?
+              El equipo sera movido a la papelera y podra restaurarlo despues si lo necesita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              No, cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Eliminando..." : "Si, eliminar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

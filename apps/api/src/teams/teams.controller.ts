@@ -4,6 +4,7 @@ import { TeamsService } from './teams.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PoliciesGuard, CheckPolicies } from '../casl/policies.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Teams')
 @Controller('teams')
@@ -14,6 +15,15 @@ export class TeamsController {
   @ApiOperation({ summary: 'Listar equipos' })
   findAll(@Query('page') page?: string, @Query('limit') limit?: string) {
     return this.teamsService.findAll(Number(page) || 1, Number(limit) || 20);
+  }
+
+  @Get('trash/list')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Team' })
+  @ApiOperation({ summary: 'Listar equipos en papelera' })
+  findTrashed(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.teamsService.findTrashed(Number(page) || 1, Number(limit) || 20);
   }
 
   @Get(':id')
@@ -44,8 +54,17 @@ export class TeamsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, PoliciesGuard)
   @CheckPolicies({ action: 'delete', subject: 'Team' })
-  @ApiOperation({ summary: 'Eliminar equipo' })
-  delete(@Param('id') id: string) {
-    return this.teamsService.delete(id);
+  @ApiOperation({ summary: 'Eliminar equipo (mover a papelera)' })
+  softDelete(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.teamsService.softDelete(id, userId);
+  }
+
+  @Post(':id/restore')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'delete', subject: 'Team' })
+  @ApiOperation({ summary: 'Restaurar equipo de la papelera' })
+  restore(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.teamsService.restore(id, userId);
   }
 }

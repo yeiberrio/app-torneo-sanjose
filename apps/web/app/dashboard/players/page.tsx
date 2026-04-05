@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Edit, Users } from "lucide-react";
@@ -38,6 +45,10 @@ export default function PlayersPage() {
     jerseyNumber: "",
     position: "",
   });
+
+  // Delete confirmation dialog state
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchPlayers = () => {
     api.get("/players").then((res) => {
@@ -79,14 +90,18 @@ export default function PlayersPage() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`¿Eliminar al jugador ${name}? Esta accion no se puede deshacer.`)) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await api.delete(`/players/${id}`);
-      toast.success("Jugador eliminado");
-      setPlayers((prev) => prev.filter((p) => p.id !== id));
+      await api.delete(`/players/${deleteTarget.id}`);
+      toast.success(`Jugador "${deleteTarget.firstName} ${deleteTarget.lastName}" movido a la papelera`);
+      setDeleteTarget(null);
+      fetchPlayers();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al eliminar jugador");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -94,7 +109,17 @@ export default function PlayersPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Jugadores</h1>
-        {canCreate && <Button asChild><Link href="/dashboard/players/new"><Plus className="h-4 w-4 mr-2" />Nuevo Jugador</Link></Button>}
+        <div className="flex gap-2">
+          {canDelete && (
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/players/papelera">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Papelera
+              </Link>
+            </Button>
+          )}
+          {canCreate && <Button asChild><Link href="/dashboard/players/new"><Plus className="h-4 w-4 mr-2" />Nuevo Jugador</Link></Button>}
+        </div>
       </div>
 
       {loading ? (
@@ -140,7 +165,7 @@ export default function PlayersPage() {
                           </Button>
                         )}
                         {canDelete && (
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDelete(p.id, `${p.firstName} ${p.lastName}`)}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleteTarget(p)}>
                             <Trash2 className="h-3.5 w-3.5 text-red-500" />
                           </Button>
                         )}
@@ -191,6 +216,27 @@ export default function PlayersPage() {
             </div>
             <Button onClick={handleEditSave} className="w-full">Guardar Cambios</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar jugador</DialogTitle>
+            <DialogDescription>
+              ¿Desea eliminar al jugador <strong>"{deleteTarget?.firstName} {deleteTarget?.lastName}"</strong>?
+              El jugador sera movido a la papelera y podra restaurarlo despues si lo necesita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              No, cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Eliminando..." : "Si, eliminar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

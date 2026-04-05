@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2, ListOrdered, Settings2, GripVertical, Edit, Check } from "lucide-react";
@@ -99,6 +99,12 @@ export default function TournamentDetailPage() {
   const [editingName, setEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState("");
 
+  // Delete confirmations
+  const [deleteFixtureOpen, setDeleteFixtureOpen] = useState(false);
+  const [deletingFixture, setDeletingFixture] = useState(false);
+  const [deleteRoundTarget, setDeleteRoundTarget] = useState<string | null>(null);
+  const [deletingRound, setDeletingRound] = useState(false);
+
   // Match day filter
   const [filterDay, setFilterDay] = useState<string>("all");
 
@@ -174,13 +180,16 @@ export default function TournamentDetailPage() {
   };
 
   const handleDeleteFixture = async () => {
-    if (!confirm("¿Eliminar todos los partidos no jugados? Esta accion no se puede deshacer.")) return;
+    setDeletingFixture(true);
     try {
       const res = await api.delete(`/tournaments/${tournamentId}/fixture`);
       toast.success(res.data.message || "Fixture eliminado");
+      setDeleteFixtureOpen(false);
       fetchTournament();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al eliminar fixture");
+    } finally {
+      setDeletingFixture(false);
     }
   };
 
@@ -228,14 +237,18 @@ export default function TournamentDetailPage() {
     }
   };
 
-  const handleDeleteRound = async (roundId: string) => {
-    if (!confirm("¿Eliminar esta ronda?")) return;
+  const handleDeleteRound = async () => {
+    if (!deleteRoundTarget) return;
+    setDeletingRound(true);
     try {
-      await api.delete(`/tournaments/rounds/${roundId}`);
+      await api.delete(`/tournaments/rounds/${deleteRoundTarget}`);
       toast.success("Ronda eliminada");
+      setDeleteRoundTarget(null);
       fetchRounds();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al eliminar ronda");
+    } finally {
+      setDeletingRound(false);
     }
   };
 
@@ -551,7 +564,7 @@ export default function TournamentDetailPage() {
                       </Dialog>
                     )}
                     {tournament.matches?.length > 0 && (
-                      <Button size="sm" variant="destructive" onClick={handleDeleteFixture}>
+                      <Button size="sm" variant="destructive" onClick={() => setDeleteFixtureOpen(true)}>
                         <Trash2 className="h-4 w-4 mr-2" />Eliminar Fixture
                       </Button>
                     )}
@@ -702,7 +715,7 @@ export default function TournamentDetailPage() {
                         </div>
                       </div>
                       {canManage && (
-                        <Button size="icon" variant="ghost" onClick={() => handleDeleteRound(round.id)}>
+                        <Button size="icon" variant="ghost" onClick={() => setDeleteRoundTarget(round.id)}>
                           <Trash2 className="h-4 w-4 text-muted-foreground" />
                         </Button>
                       )}
@@ -804,6 +817,47 @@ export default function TournamentDetailPage() {
           </Dialog>
         </TabsContent>
       </Tabs>
+
+      {/* Delete fixture confirmation */}
+      <Dialog open={deleteFixtureOpen} onOpenChange={setDeleteFixtureOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar fixture</DialogTitle>
+            <DialogDescription>
+              ¿Desea eliminar todos los partidos no jugados del torneo <strong>"{tournament.name}"</strong>?
+              Los partidos ya finalizados no se veran afectados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteFixtureOpen(false)} disabled={deletingFixture}>
+              No, cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteFixture} disabled={deletingFixture}>
+              {deletingFixture ? "Eliminando..." : "Si, eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete round confirmation */}
+      <Dialog open={!!deleteRoundTarget} onOpenChange={(open) => { if (!open) setDeleteRoundTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar ronda</DialogTitle>
+            <DialogDescription>
+              ¿Desea eliminar esta ronda del torneo?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteRoundTarget(null)} disabled={deletingRound}>
+              No, cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteRound} disabled={deletingRound}>
+              {deletingRound ? "Eliminando..." : "Si, eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

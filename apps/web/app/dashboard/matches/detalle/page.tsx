@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ArrowLeft, Plus, Clock, CircleDot, Wifi, WifiOff, CalendarClock, Edit, Trash2, ShieldAlert, ShieldBan, Users } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -90,6 +90,13 @@ export default function MatchDetailPage() {
     minuteCards: "" as string,
   });
   const [savingPlayerEvents, setSavingPlayerEvents] = useState(false);
+
+  // Delete confirmation states
+  const [deleteMatchOpen, setDeleteMatchOpen] = useState(false);
+  const [deletingMatch, setDeletingMatch] = useState(false);
+  const [deleteEventTarget, setDeleteEventTarget] = useState<string | null>(null);
+  const [deletingEvent, setDeletingEvent] = useState(false);
+
   const [wsConnected, setWsConnected] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleForm, setRescheduleForm] = useState({
@@ -324,14 +331,18 @@ export default function MatchDetailPage() {
     resetPlayerEventForm();
   };
 
-  const handleDeleteEvent = async (eventId: string) => {
-    if (!confirm("¿Eliminar este evento?")) return;
+  const handleDeleteEvent = async () => {
+    if (!deleteEventTarget) return;
+    setDeletingEvent(true);
     try {
-      await api.delete(`/matches/${matchId}/events/${eventId}`);
+      await api.delete(`/matches/${matchId}/events/${deleteEventTarget}`);
       toast.success("Evento eliminado");
+      setDeleteEventTarget(null);
       fetchMatch();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al eliminar evento");
+    } finally {
+      setDeletingEvent(false);
     }
   };
 
@@ -376,13 +387,16 @@ export default function MatchDetailPage() {
   };
 
   const handleDeleteMatch = async () => {
-    if (!confirm("¿Eliminar este partido? Esta accion no se puede deshacer.")) return;
+    setDeletingMatch(true);
     try {
       await api.delete(`/matches/${matchId}`);
       toast.success("Partido eliminado");
       window.location.href = "/dashboard/matches";
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al eliminar partido");
+    } finally {
+      setDeletingMatch(false);
+      setDeleteMatchOpen(false);
     }
   };
 
@@ -403,7 +417,7 @@ export default function MatchDetailPage() {
         <h1 className="text-2xl font-bold flex-1">Planilla de Partido</h1>
         <div className="flex items-center gap-2">
           {canManageMatch && (
-            <Button size="sm" variant="destructive" onClick={handleDeleteMatch}>
+            <Button size="sm" variant="destructive" onClick={() => setDeleteMatchOpen(true)}>
               <Trash2 className="h-4 w-4 mr-1" />Eliminar
             </Button>
           )}
@@ -819,7 +833,7 @@ export default function MatchDetailPage() {
                       {event.description && <p className="text-xs text-muted-foreground italic">{event.description}</p>}
                     </div>
                     {canDeleteEvents && (
-                      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => handleDeleteEvent(event.id)}>
+                      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setDeleteEventTarget(event.id)}>
                         <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-red-600" />
                       </Button>
                     )}
@@ -872,6 +886,47 @@ export default function MatchDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Delete match confirmation dialog */}
+      <Dialog open={deleteMatchOpen} onOpenChange={setDeleteMatchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar partido</DialogTitle>
+            <DialogDescription>
+              ¿Desea eliminar el partido <strong>{teamAName} vs {teamBName}</strong>?
+              Esta accion eliminara todos los eventos y estadisticas asociados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteMatchOpen(false)} disabled={deletingMatch}>
+              No, cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteMatch} disabled={deletingMatch}>
+              {deletingMatch ? "Eliminando..." : "Si, eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete event confirmation dialog */}
+      <Dialog open={!!deleteEventTarget} onOpenChange={(open) => { if (!open) setDeleteEventTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar evento</DialogTitle>
+            <DialogDescription>
+              ¿Desea eliminar este evento? Si es un gol, el marcador se recalculara automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteEventTarget(null)} disabled={deletingEvent}>
+              No, cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteEvent} disabled={deletingEvent}>
+              {deletingEvent ? "Eliminando..." : "Si, eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

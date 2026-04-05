@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -110,6 +110,10 @@ export default function TeamDetailPage() {
   const [editPlayer, setEditPlayer] = useState<Player | null>(null);
   const [editPlayerForm, setEditPlayerForm] = useState({ firstName: "", lastName: "", jerseyNumber: "", position: "" });
 
+  // Delete player confirmation
+  const [deletePlayerTarget, setDeletePlayerTarget] = useState<Player | null>(null);
+  const [deletingPlayer, setDeletingPlayer] = useState(false);
+
   // Logo upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -207,14 +211,18 @@ export default function TeamDetailPage() {
     }
   };
 
-  const handleDeletePlayer = async (player: Player) => {
-    if (!confirm(`¿Eliminar a ${player.firstName} ${player.lastName}?`)) return;
+  const handleDeletePlayer = async () => {
+    if (!deletePlayerTarget) return;
+    setDeletingPlayer(true);
     try {
-      await api.delete(`/players/${player.id}`);
-      toast.success("Jugador eliminado");
+      await api.delete(`/players/${deletePlayerTarget.id}`);
+      toast.success(`Jugador "${deletePlayerTarget.firstName} ${deletePlayerTarget.lastName}" movido a la papelera`);
+      setDeletePlayerTarget(null);
       fetchTeam();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al eliminar jugador");
+    } finally {
+      setDeletingPlayer(false);
     }
   };
 
@@ -356,7 +364,7 @@ export default function TeamDetailPage() {
                                     </Button>
                                   )}
                                   {canDeletePlayer && (
-                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleDeletePlayer(player)}>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeletePlayerTarget(player)}>
                                       <Trash2 className="h-3.5 w-3.5 text-red-500" />
                                     </Button>
                                   )}
@@ -492,6 +500,27 @@ export default function TeamDetailPage() {
             </div>
             <Button onClick={handleEditPlayerSave} className="w-full">Guardar Cambios</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete player confirmation dialog */}
+      <Dialog open={!!deletePlayerTarget} onOpenChange={(open) => { if (!open) setDeletePlayerTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar jugador</DialogTitle>
+            <DialogDescription>
+              ¿Desea eliminar al jugador <strong>"{deletePlayerTarget?.firstName} {deletePlayerTarget?.lastName}"</strong>?
+              El jugador sera movido a la papelera y podra restaurarlo despues si lo necesita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletePlayerTarget(null)} disabled={deletingPlayer}>
+              No, cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeletePlayer} disabled={deletingPlayer}>
+              {deletingPlayer ? "Eliminando..." : "Si, eliminar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

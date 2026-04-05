@@ -424,10 +424,23 @@ export class TournamentsService {
     if (!tournament) throw new NotFoundException('Torneo no encontrado');
     if (tournament.deletedAt) throw new BadRequestException('El torneo ya está en la papelera');
 
-    return this.prisma.tournament.update({
+    await this.prisma.tournament.update({
       where: { id },
       data: { deletedAt: new Date(), deletedBy: userId },
     });
+
+    // Log audit
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'DELETE',
+        entity: 'Tournament',
+        entityId: id,
+        oldValue: { name: tournament.name, type: tournament.type },
+      },
+    });
+
+    return { message: 'Torneo movido a la papelera' };
   }
 
   async findTrashed(page = 1, limit = 20) {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 
@@ -12,13 +12,15 @@ export class TeamsService {
 
   async findAll(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
+    const where = { deletedAt: null };
     const [data, total] = await Promise.all([
       this.prisma.team.findMany({
+        where,
         skip, take: limit,
         include: { _count: { select: { players: true } } },
         orderBy: { name: 'asc' },
       }),
-      this.prisma.team.count(),
+      this.prisma.team.count({ where }),
     ]);
     return { data, total, page, limit };
   }
@@ -27,7 +29,7 @@ export class TeamsService {
     const team = await this.prisma.team.findUnique({
       where: { id },
       include: {
-        players: { orderBy: { jerseyNumber: 'asc' } },
+        players: { where: { deletedAt: null }, orderBy: { jerseyNumber: 'asc' } },
         tournaments: {
           include: { tournament: { select: { id: true, name: true, type: true, status: true } } },
         },
@@ -41,7 +43,66 @@ export class TeamsService {
     return this.prisma.team.update({ where: { id }, data: dto });
   }
 
-  async delete(id: string) {
-    return this.prisma.team.delete({ where: { id } });
+  async softDelete(id: string, userId: string) {
+    const team = await this.prisma.team.findUnique({ where: { id } });
+    if (!team) throw new NotFoundException('Equipo no encontrado');
+    if (team.deletedAt) throw new BadRequestException('El equipo ya esta en la papelera');
+
+    await this.prisma.team.update({
+      where: { id },
+      data: { deletedAt: new Date(), deletedBy: userId },
+    });
+
+    // Log audit
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'DELETE',
+        entity: 'Team',
+        entityId: id,
+        oldValue: { name: team.name, city: team.city },
+      },
+    });
+
+    return { message: 'Equipo movido a la papelera' };
+  }
+
+  async findTrashed(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where = { deletedAt: { not: null } };
+    const [data, total] = await Promise.all([
+      this.prisma.team.findMany({
+        where: where as any,
+        skip, take: limit,
+        include: { _count: { select: { players: true } } },
+        orderBy: { deletedAt: 'desc' },
+      }),
+      this.prisma.team.count({ where: where as any }),
+    ]);
+    return { data, total, page, limit };
+  }
+
+  async restore(id: string, userId: string) {
+    const team = await this.prisma.team.findUnique({ where: { id } });
+    if (!team) throw new NotFoundException('Equipo no encontrado');
+    if (!team.deletedAt) throw new BadRequestException('El equipo no esta en la papelera');
+
+    await this.prisma.team.update({
+      where: { id },
+      data: { deletedAt: null, deletedBy: null },
+    });
+
+    // Log audit
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'RESTORE',
+        entity: 'Team',
+        entityId: id,
+        newValue: { name: team.name },
+      },
+    });
+
+    return { message: 'Equipo restaurado' };
   }
 }
