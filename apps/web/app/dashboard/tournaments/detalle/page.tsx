@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2, ListOrdered, Settings2, GripVertical, Edit, Check } from "lucide-react";
+import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2, ListOrdered, Settings2, GripVertical, Edit, Check, Download } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -98,6 +98,9 @@ export default function TournamentDetailPage() {
   // Edit tournament name state
   const [editingName, setEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState("");
+
+  // Export state
+  const [exporting, setExporting] = useState(false);
 
   // Delete confirmations
   const [deleteFixtureOpen, setDeleteFixtureOpen] = useState(false);
@@ -190,6 +193,26 @@ export default function TournamentDetailPage() {
       toast.error(err.response?.data?.message || "Error al eliminar fixture");
     } finally {
       setDeletingFixture(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const res = await api.get(`/tournaments/${tournamentId}/export-excel`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `torneo_${tournament?.name || tournamentId}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Excel exportado exitosamente");
+    } catch {
+      toast.error("Error al exportar Excel");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -355,19 +378,25 @@ export default function TournamentDetailPage() {
             <span className="text-sm text-muted-foreground">{typeLabels[tournament.type] || tournament.type}</span>
           </div>
         </div>
-        {canManage && (
-          <div className="flex gap-2">
-            {tournament.status === "DRAFT" && (
-              <Button size="sm" onClick={() => handleStatusChange("PUBLISHED")}>Publicar</Button>
-            )}
-            {tournament.status === "PUBLISHED" && (
-              <Button size="sm" onClick={() => handleStatusChange("IN_PROGRESS")}>Iniciar</Button>
-            )}
-            {tournament.status === "IN_PROGRESS" && (
-              <Button size="sm" variant="outline" onClick={() => handleStatusChange("FINISHED")}>Finalizar</Button>
-            )}
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={handleExportExcel} disabled={exporting}>
+            <Download className="h-4 w-4 mr-1" />
+            {exporting ? "Exportando..." : "Excel"}
+          </Button>
+          {canManage && (
+            <>
+              {tournament.status === "DRAFT" && (
+                <Button size="sm" onClick={() => handleStatusChange("PUBLISHED")}>Publicar</Button>
+              )}
+              {tournament.status === "PUBLISHED" && (
+                <Button size="sm" onClick={() => handleStatusChange("IN_PROGRESS")}>Iniciar</Button>
+              )}
+              {tournament.status === "IN_PROGRESS" && (
+                <Button size="sm" variant="outline" onClick={() => handleStatusChange("FINISHED")}>Finalizar</Button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Info cards */}

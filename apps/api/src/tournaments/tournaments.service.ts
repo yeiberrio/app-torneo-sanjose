@@ -6,6 +6,7 @@ import { GenerateFixtureDto } from './dto/generate-fixture.dto';
 import { CreateRoundDto } from './dto/create-round.dto';
 import { ConfigureTiebreakersDto } from './dto/configure-tiebreakers.dto';
 import * as bcrypt from 'bcryptjs';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class TournamentsService {
@@ -410,6 +411,126 @@ export class TournamentsService {
       where: { tournamentId, roundId: roundId || null },
       orderBy: { priority: 'asc' },
     });
+  }
+
+  // --- Export to Excel ---
+  async exportToExcel(tournamentId: string): Promise<Buffer> {
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: {
+        teams: { include: { team: { include: { players: { where: { deletedAt: null } } } } } },
+        matches: {
+          orderBy: { scheduledAt: 'asc' },
+          include: {
+            events: { include: { player: { select: { firstName: true, lastName: true, jerseyNumber: true } } } },
+          },
+        },
+      },
+    });
+    if (!tournament) throw new NotFoundException('Torneo no encontrado');
+
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Tournament Info
+    const infoData = [
+      ['Torneo', tournament.name],
+      ['Tipo', tournament.type],
+      ['Estado', tournament.status],
+      ['Fecha inicio', tournament.startDate ? new Date(tournament.startDate).toLocaleDateString('es-CO') : ''],
+      ['Fecha fin', tournament.endDate ? new Date(tournament.endDate).toLocaleDateString('es-CO') : ''],
+      ['Puntos Victoria', tournament.winPoints],
+      ['Puntos Empate', tournament.drawPoints],
+      ['Puntos Derrota', tournament.lossPoints],
+      ['Max Amarillas', tournament.maxYellowCards],
+      ['Equipos', tournament.teams?.length || 0],
+      ['Partidos', tournament.matches?.length || 0],
+    ];
+    const wsInfo = XLSX.utils.aoa_to_sheet(infoData);
+    wsInfo['!cols'] = [{ wch: 20 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, wsInfo, 'Torneo');
+
+    // Sheet 2: Standings
+    const standings = await this.getStandings(tournamentId);
+    const standingsHeader = ['Pos', 'Equipo', 'PJ', 'PG', 'PE', 'PP', 'GF', 'GC', 'DG', 'Pts'];
+    const standingsRows = standings.map((s, i) => [
+      i + 1, s.team.name, s.played, s.won, s.drawn, s.lost,
+      s.goalsFor, s.goalsAgainst, s.goalDifference, s.points,
+    ]);
+    const wsStandings = XLSX.utils.aoa_to_sheet([standingsHeader, ...standingsRows]);
+    wsStandings['!cols'] = [{ wch: 5 }, { wch: 30 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }];
+    XLSX.utils.book_append_sheet(wb, wsStandings, 'Posiciones');
+
+    // Sheet 3: Teams & Players
+    const playersHeader = ['Equipo', '#', 'Nombre', 'Apellido', 'Posicion', 'Estado'];
+    const playersRows: any[][] = [];
+    for (const tt of tournament.teams || []) {
+      for (const p of tt.team.players || []) {
+        playersRows.push([tt.team.name, p.jerseyNumber || '', p.firstName, p.lastName, p.position || '', p.status]);
+      }
+    }
+    const wsPlayers = XLSX.utils.aoa_to_sheet([playersHeader, ...playersRows]);
+    wsPlayers['!cols'] = [{ wch: 25 }, { wch: 5 }, { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, wsPlayers, 'Jugadores');
+
+    // Sheet 4: Matches
+    const teamMap = new Map((tournament.teams || []).map(tt => [tt.teamId, tt.team.name]));
+    const matchesHeader = ['Jornada', 'Fecha', 'Local', 'Goles L', 'Goles V', 'Visitante', 'Estado', 'Sede'];
+    const matchesRows = (tournament.matches || []).map((m) => [
+      m.dayNumber || '',
+      new Date(m.scheduledAt).toLocaleDateString('es-CO'),
+      teamMap.get(m.teamAId) || m.teamAId,
+      m.scoreA ?? '',
+      m.scoreB ?? '',
+      teamMap.get(m.teamBId) || m.teamBId,
+      m.status,
+      m.venue || '',
+    ]);
+    const wsMatches = XLSX.utils.aoa_to_sheet([matchesHeader, ...matchesRows]);
+    wsMatches['!cols'] = [{ wch: 8 }, { wch: 12 }, { wch: 25 }, { wch: 8 }, { wch: 8 }, { wch: 25 }, { wch: 12 }, { wch: 25 }];
+    XLSX.utils.book_append_sheet(wb, wsMatches, 'Partidos');
+
+    // Sheet 5: Events / Goals / Cards
+    const eventsHeader = ['Partido', 'Minuto', 'Tipo', 'Jugador', 'Equipo'];
+    const eventsRows: any[][] = [];
+    for (const m of tournament.matches || []) {
+      const matchLabel = `${teamMap.get(m.teamAId) || '?'} vs ${teamMap.get(m.teamBId) || '?'}`;
+      for (const e of m.events || []) {
+        eventsRows.push([
+          matchLabel,
+          e.minute || '',
+          e.type,
+          e.player ? `#${e.player.jerseyNumber || '?'} ${e.player.firstName} ${e.player.lastName}` : '',
+          teamMap.get(e.teamId) || e.teamId,
+        ]);
+      }
+    }
+    const wsEvents = XLSX.utils.aoa_to_sheet([eventsHeader, ...eventsRows]);
+    wsEvents['!cols'] = [{ wch: 40 }, { wch: 8 }, { wch: 20 }, { wch: 30 }, { wch: 25 }];
+    XLSX.utils.book_append_sheet(wb, wsEvents, 'Eventos');
+
+    // Sheet 6: Sanctions
+    const sanctions = await this.prisma.sanction.findMany({
+      where: { tournamentId },
+      include: { player: { select: { firstName: true, lastName: true, jerseyNumber: true, team: { select: { name: true } } } } },
+      orderBy: { imposedAt: 'desc' },
+    });
+    const sanctionsHeader = ['Jugador', '#', 'Equipo', 'Tipo', 'Partidos', 'Cumplidos', 'Activa', 'Motivo', 'Fecha'];
+    const sanctionsRows = sanctions.map(s => [
+      `${s.player.firstName} ${s.player.lastName}`,
+      s.player.jerseyNumber || '',
+      s.player.team?.name || '',
+      s.type,
+      s.matchesBanned,
+      s.matchesServed,
+      s.isActive ? 'SI' : 'NO',
+      s.reason || '',
+      new Date(s.imposedAt).toLocaleDateString('es-CO'),
+    ]);
+    const wsSanctions = XLSX.utils.aoa_to_sheet([sanctionsHeader, ...sanctionsRows]);
+    wsSanctions['!cols'] = [{ wch: 25 }, { wch: 5 }, { wch: 25 }, { wch: 22 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 40 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, wsSanctions, 'Sanciones');
+
+    return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
   }
 
   // --- Soft Delete (Papelera) ---

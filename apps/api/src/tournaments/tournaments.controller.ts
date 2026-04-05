@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Res, StreamableFile } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { TournamentsService } from './tournaments.service';
 import { CreateTournamentDto } from './dto/create-tournament.dto';
@@ -40,6 +40,18 @@ export class TournamentsController {
   @ApiOperation({ summary: 'Tabla de posiciones' })
   getStandings(@Param('id') id: string) {
     return this.tournamentsService.getStandings(id);
+  }
+
+  @Get(':id/export-excel')
+  @ApiOperation({ summary: 'Exportar torneo a Excel' })
+  async exportExcel(@Param('id') id: string, @Res() res: any) {
+    const buffer = await this.tournamentsService.exportToExcel(id);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename=torneo_${id}.xlsx`,
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
   }
 
   @Post()
