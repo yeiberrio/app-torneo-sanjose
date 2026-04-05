@@ -79,44 +79,42 @@ export default function PlayerDetailPage() {
   const sanctions = player.sanctions || [];
   const st = player.status ? statusLabels[player.status] : null;
 
-  // Aggregate totals from events (real data) since MatchPlayerStat may not be populated
+  // Count events by type
   const eventCounts: Record<string, number> = {};
   events.forEach((e: any) => { eventCounts[e.type] = (eventCounts[e.type] || 0) + 1; });
 
-  // Count unique matches from events
-  const matchIdsFromEvents = new Set<string>();
-  events.forEach((e: any) => { if (e.match?.id) matchIdsFromEvents.add(e.match.id); });
-  // Also count from stats
-  stats.forEach((s: any) => { if (s.match?.id) matchIdsFromEvents.add(s.match.id); });
+  // Build match-level data from events (since MatchPlayerStat is often empty)
+  const matchEventsMap: Record<string, { matchId: string; match: any; goals: number; ownGoals: number; yellowCards: number; blueCards: number; redCards: number; fouls: number; penaltyScored: number; penaltyMissed: number }> = {};
+  events.forEach((e: any) => {
+    const mid = e.match?.id || e.matchId;
+    if (!mid) return;
+    if (!matchEventsMap[mid]) {
+      matchEventsMap[mid] = { matchId: mid, match: e.match, goals: 0, ownGoals: 0, yellowCards: 0, blueCards: 0, redCards: 0, fouls: 0, penaltyScored: 0, penaltyMissed: 0 };
+    }
+    const m = matchEventsMap[mid];
+    if (e.type === "GOAL") m.goals++;
+    else if (e.type === "OWN_GOAL") m.ownGoals++;
+    else if (e.type === "YELLOW_CARD") m.yellowCards++;
+    else if (e.type === "BLUE_CARD") m.blueCards++;
+    else if (e.type === "RED_CARD") m.redCards++;
+    else if (e.type === "YELLOW_RED_CARD") m.redCards++;
+    else if (e.type === "FOUL") m.fouls++;
+    else if (e.type === "PENALTY_SCORED") { m.penaltyScored++; m.goals++; }
+    else if (e.type === "PENALTY_MISSED") m.penaltyMissed++;
+  });
+  const matchEventsList = Object.values(matchEventsMap);
 
-  // Use events as primary source for totals, fall back to stats aggregation
-  const statsAgg = stats.reduce((acc: any, s: any) => ({
-    goals: acc.goals + (s.goals || 0),
-    assists: acc.assists + (s.assists || 0),
-    yellowCards: acc.yellowCards + (s.yellowCards || 0),
-    redCards: acc.redCards + (s.redCards || 0),
-    fouls: acc.fouls + (s.fouls || 0),
-    minutesPlayed: acc.minutesPlayed + (s.minutesPlayed || 0),
-  }), { goals: 0, assists: 0, yellowCards: 0, redCards: 0, fouls: 0, minutesPlayed: 0 });
-
-  const eventsGoals = (eventCounts["GOAL"] || 0) + (eventCounts["PENALTY_SCORED"] || 0);
-  const eventsYellow = eventCounts["YELLOW_CARD"] || 0;
-  const eventsBlue = eventCounts["BLUE_CARD"] || 0;
-  const eventsRed = (eventCounts["RED_CARD"] || 0) + (eventCounts["YELLOW_RED_CARD"] || 0);
-  const eventsFouls = eventCounts["FOUL"] || 0;
-  const eventsOwnGoals = eventCounts["OWN_GOAL"] || 0;
-
-  // Use whichever source has more data
+  // Calculate totals from events
   const totals = {
-    matchesPlayed: Math.max(matchIdsFromEvents.size, stats.length),
-    goals: Math.max(eventsGoals, statsAgg.goals),
-    ownGoals: eventsOwnGoals,
-    assists: statsAgg.assists,
-    yellowCards: Math.max(eventsYellow, statsAgg.yellowCards),
-    blueCards: eventsBlue,
-    redCards: Math.max(eventsRed, statsAgg.redCards),
-    fouls: Math.max(eventsFouls, statsAgg.fouls),
-    minutesPlayed: statsAgg.minutesPlayed,
+    matchesPlayed: matchEventsList.length,
+    goals: (eventCounts["GOAL"] || 0) + (eventCounts["PENALTY_SCORED"] || 0),
+    ownGoals: eventCounts["OWN_GOAL"] || 0,
+    assists: stats.reduce((a: number, s: any) => a + (s.assists || 0), 0),
+    yellowCards: eventCounts["YELLOW_CARD"] || 0,
+    blueCards: eventCounts["BLUE_CARD"] || 0,
+    redCards: (eventCounts["RED_CARD"] || 0) + (eventCounts["YELLOW_RED_CARD"] || 0),
+    fouls: eventCounts["FOUL"] || 0,
+    minutesPlayed: stats.reduce((a: number, s: any) => a + (s.minutesPlayed || 0), 0),
     penaltyScored: eventCounts["PENALTY_SCORED"] || 0,
     penaltyMissed: eventCounts["PENALTY_MISSED"] || 0,
   };
@@ -223,33 +221,31 @@ export default function PlayerDetailPage() {
       {/* Tabs */}
       <Tabs defaultValue="matches">
         <TabsList className="mb-4">
-          <TabsTrigger value="matches">Partidos ({stats.length})</TabsTrigger>
+          <TabsTrigger value="matches">Partidos ({matchEventsList.length})</TabsTrigger>
           <TabsTrigger value="events">Eventos ({events.length})</TabsTrigger>
           <TabsTrigger value="sanctions">Sanciones ({sanctions.length})</TabsTrigger>
         </TabsList>
 
         {/* Matches tab */}
         <TabsContent value="matches">
-          {stats.length === 0 ? (
+          {matchEventsList.length === 0 ? (
             <Card><CardContent className="p-8 text-center text-muted-foreground">Sin partidos registrados.</CardContent></Card>
           ) : (
             <div className="space-y-2">
-              {stats.map((s: any) => {
-                const m = s.match;
+              {matchEventsList.map((me) => {
+                const m = me.match;
+                if (!m) return null;
                 const opponent = getOpponent(m);
                 const result = getResult(m);
                 const isTeamA = m.teamAId === player.teamId;
                 return (
-                  <Link key={s.id} href={`/dashboard/matches/detalle?id=${m.id}`}>
+                  <Link key={me.matchId} href={`/dashboard/matches/detalle?id=${me.matchId}`}>
                     <Card className="card-hover cursor-pointer">
                       <CardContent className="p-3">
                         <div className="flex items-center gap-3">
-                          {/* Result badge */}
                           <div className={`h-8 w-8 rounded-lg flex items-center justify-center font-bold text-xs ${result ? result.color : "bg-blue-50 text-blue-600"}`}>
-                            {result ? result.label : matchStatusLabels[m.status]?.charAt(0) || "?"}
+                            {result ? result.label : "?"}
                           </div>
-
-                          {/* Match info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 text-sm">
                               <span className="font-medium">vs {opponent}</span>
@@ -258,23 +254,18 @@ export default function PlayerDetailPage() {
                                   ({isTeamA ? m.scoreA : m.scoreB} - {isTeamA ? m.scoreB : m.scoreA})
                                 </span>
                               )}
-                              {m.tournament && <Badge variant="outline" className="text-xs">{m.tournament.name}</Badge>}
                             </div>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                               <span>{new Date(m.scheduledAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}</span>
-                              {m.dayNumber && <span>Fecha {m.dayNumber}</span>}
-                              {m.venue && <span>{m.venue}</span>}
                             </div>
                           </div>
-
-                          {/* Player stats for this match */}
-                          <div className="flex items-center gap-2 shrink-0 text-xs">
-                            {s.goals > 0 && <Badge variant="secondary" className="text-xs">⚽ {s.goals}</Badge>}
-                            {s.assists > 0 && <Badge variant="secondary" className="text-xs">👟 {s.assists}</Badge>}
-                            {s.yellowCards > 0 && <Badge className="text-xs bg-yellow-100 text-yellow-800">🟨 {s.yellowCards}</Badge>}
-                            {s.redCards > 0 && <Badge className="text-xs bg-red-100 text-red-800">🟥 {s.redCards}</Badge>}
-                            {s.fouls > 0 && <span className="text-muted-foreground">⚠️{s.fouls}</span>}
-                            {s.minutesPlayed ? <span className="text-muted-foreground">{s.minutesPlayed}'</span> : null}
+                          <div className="flex items-center gap-1.5 shrink-0 text-xs flex-wrap justify-end">
+                            {me.goals > 0 && <Badge variant="secondary" className="text-xs">⚽ {me.goals}</Badge>}
+                            {me.ownGoals > 0 && <Badge variant="secondary" className="text-xs">⚽🔴 {me.ownGoals}</Badge>}
+                            {me.yellowCards > 0 && <Badge className="text-xs bg-yellow-100 text-yellow-800">🟨 {me.yellowCards}</Badge>}
+                            {me.blueCards > 0 && <Badge className="text-xs bg-blue-100 text-blue-800">🟦 {me.blueCards}</Badge>}
+                            {me.redCards > 0 && <Badge className="text-xs bg-red-100 text-red-800">🟥 {me.redCards}</Badge>}
+                            {me.fouls > 0 && <Badge variant="outline" className="text-xs">⚠️ {me.fouls}</Badge>}
                           </div>
                         </div>
                       </CardContent>

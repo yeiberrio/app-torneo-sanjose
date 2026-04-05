@@ -48,7 +48,13 @@ export class PlayersService {
         },
         events: {
           include: {
-            match: { select: { id: true, scheduledAt: true, teamAId: true, teamBId: true } },
+            match: {
+              select: {
+                id: true, scheduledAt: true, teamAId: true, teamBId: true,
+                status: true, scoreA: true, scoreB: true, dayNumber: true, venue: true,
+                tournament: { select: { id: true, name: true } },
+              },
+            },
           },
           orderBy: { match: { scheduledAt: 'desc' } },
         },
@@ -57,9 +63,10 @@ export class PlayersService {
     });
     if (!player) throw new NotFoundException('Jugador no encontrado');
 
-    // Resolve team names for matches
+    // Resolve team names for matches (from stats and events)
     const matchTeamIds = new Set<string>();
     player.stats.forEach(s => { matchTeamIds.add(s.match.teamAId); matchTeamIds.add(s.match.teamBId); });
+    player.events.forEach((e: any) => { if (e.match) { matchTeamIds.add(e.match.teamAId); matchTeamIds.add(e.match.teamBId); } });
     const teams = await this.prisma.team.findMany({
       where: { id: { in: Array.from(matchTeamIds) } },
       select: { id: true, name: true },
