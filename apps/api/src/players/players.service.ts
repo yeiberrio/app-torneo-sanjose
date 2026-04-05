@@ -33,12 +33,40 @@ export class PlayersService {
       where: { id },
       include: {
         team: true,
-        stats: { include: { match: { select: { id: true, scheduledAt: true, venue: true } } } },
-        sanctions: true,
+        stats: {
+          include: {
+            match: {
+              select: {
+                id: true, scheduledAt: true, venue: true, status: true,
+                scoreA: true, scoreB: true, teamAId: true, teamBId: true,
+                dayNumber: true,
+                tournament: { select: { id: true, name: true } },
+              },
+            },
+          },
+          orderBy: { match: { scheduledAt: 'desc' } },
+        },
+        events: {
+          include: {
+            match: { select: { id: true, scheduledAt: true, teamAId: true, teamBId: true } },
+          },
+          orderBy: { match: { scheduledAt: 'desc' } },
+        },
+        sanctions: { orderBy: { imposedAt: 'desc' } },
       },
     });
     if (!player) throw new NotFoundException('Jugador no encontrado');
-    return player;
+
+    // Resolve team names for matches
+    const matchTeamIds = new Set<string>();
+    player.stats.forEach(s => { matchTeamIds.add(s.match.teamAId); matchTeamIds.add(s.match.teamBId); });
+    const teams = await this.prisma.team.findMany({
+      where: { id: { in: Array.from(matchTeamIds) } },
+      select: { id: true, name: true },
+    });
+    const teamMap = Object.fromEntries(teams.map(t => [t.id, t.name]));
+
+    return { ...player, _teamMap: teamMap };
   }
 
   async update(id: string, dto: UpdatePlayerDto) {

@@ -231,7 +231,11 @@ export default function PlayersPage() {
               {filteredPlayers.map((p) => (
                 <tr key={p.id} className="border-b hover:bg-muted/50">
                   <td className="p-3">{p.jerseyNumber || "-"}</td>
-                  <td className="p-3 font-medium">{p.firstName} {p.lastName}</td>
+                  <td className="p-3 font-medium">
+                    <Link href={`/dashboard/players/detalle?id=${p.id}`} className="hover:text-primary hover:underline transition-colors">
+                      {p.firstName} {p.lastName}
+                    </Link>
+                  </td>
                   <td className="p-3">{p.team?.name || "-"}</td>
                   <td className="p-3">{positionLabels[p.position] || p.position || "-"}</td>
                   <td className="p-3">
