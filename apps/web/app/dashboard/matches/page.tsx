@@ -67,72 +67,81 @@ export default function MatchesPage() {
     return result;
   }, [matches, searchText, filterStatus]);
 
-  // Group matches by dayNumber - ALWAYS, regardless of tournament selection
+  // Group matches by dayNumber, using scheduledAt as date reference
   const groupedMatches = useMemo(() => {
-    const groups = new Map<string, { label: string; matches: any[]; sortKey: number }>();
+    const groups = new Map<string, { label: string; matches: any[]; sortKey: number; avgDate: number }>();
 
     filteredMatches.forEach(m => {
       const key = m.dayNumber ? String(m.dayNumber) : "sin-fecha";
       if (!groups.has(key)) {
+        // Build a label with the date range of this day
+        const dateStr = m.scheduledAt
+          ? new Date(m.scheduledAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })
+          : "";
         groups.set(key, {
           label: m.dayNumber ? `Fecha ${m.dayNumber}` : "Sin fecha asignada",
           matches: [],
           sortKey: m.dayNumber || 9999,
+          avgDate: 0,
         });
       }
       groups.get(key)!.matches.push(m);
     });
 
-    groups.forEach(g => g.matches.sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()));
+    // Calculate average date per group for sorting and proximity detection
+    groups.forEach(g => {
+      const dates = g.matches.map((m: any) => new Date(m.scheduledAt).getTime());
+      g.avgDate = dates.reduce((a: number, b: number) => a + b, 0) / dates.length;
+      g.matches.sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+      // Add date to label
+      if (g.matches.length > 0 && g.matches[0].dayNumber) {
+        const first = new Date(g.matches[0].scheduledAt);
+        g.label = `Fecha ${g.matches[0].dayNumber} - ${first.toLocaleDateString("es-CO", { day: "2-digit", month: "long" })}`;
+      }
+    });
 
     return Array.from(groups.entries()).sort((a, b) => a[1].sortKey - b[1].sortKey);
   }, [filteredMatches]);
 
-  // Auto-expand current and next day - re-init when matches change
+  // Auto-expand: find the fecha closest to today based on real scheduledAt dates
   useEffect(() => {
     if (matches.length === 0) return;
-    // Use a key to detect changes
     const initKey = `${selectedTournament}-${matches.length}`;
     if (lastInitRef.current === initKey) return;
     lastInitRef.current = initKey;
 
-    // Find which days to expand: current (first with unfinished) + next
-    const dayMap = new Map<number, boolean>();
+    const now = Date.now();
+
+    // Build a map of dayNumber -> average date timestamp
+    const dayDates = new Map<string, number>();
+    const dayMatchMap = new Map<string, any[]>();
     matches.forEach(m => {
-      if (!m.dayNumber) return;
-      const hasUnfinished = m.status !== "FINISHED" && m.status !== "CANCELLED";
-      if (hasUnfinished) dayMap.set(m.dayNumber, true);
-      else if (!dayMap.has(m.dayNumber)) dayMap.set(m.dayNumber, false);
+      const key = m.dayNumber ? String(m.dayNumber) : "sin-fecha";
+      if (!dayMatchMap.has(key)) dayMatchMap.set(key, []);
+      dayMatchMap.get(key)!.push(m);
     });
 
-    const sortedDayNums = Array.from(dayMap.keys()).sort((a, b) => a - b);
-    const expanded = new Set<string>();
-    expanded.add("sin-fecha");
+    dayMatchMap.forEach((ms, key) => {
+      const avg = ms.reduce((sum: number, m: any) => sum + new Date(m.scheduledAt).getTime(), 0) / ms.length;
+      dayDates.set(key, avg);
+    });
 
-    let foundCurrent = false;
-    for (const d of sortedDayNums) {
-      if (dayMap.get(d)) {
-        expanded.add(String(d));
-        if (!foundCurrent) {
-          foundCurrent = true;
-        } else {
-          // Found the next one too, stop
-          break;
-        }
+    // Find the day closest to today
+    let closestKey: string | null = null;
+    let closestDist = Infinity;
+    dayDates.forEach((avgDate, key) => {
+      const dist = Math.abs(avgDate - now);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestKey = key;
       }
-    }
+    });
 
-    // If nothing unfinished, expand last two
-    if (!foundCurrent && sortedDayNums.length > 0) {
-      expanded.add(String(sortedDayNums[sortedDayNums.length - 1]));
-      if (sortedDayNums.length > 1) expanded.add(String(sortedDayNums[sortedDayNums.length - 2]));
-    }
-
-    // Collapse everything NOT in expanded
-    const allDays = new Set(matches.map(m => m.dayNumber ? String(m.dayNumber) : "sin-fecha"));
+    // Only expand the closest day, collapse all others
+    const allKeys = Array.from(dayMatchMap.keys());
     const collapsed = new Set<string>();
-    allDays.forEach(d => {
-      if (!expanded.has(d)) collapsed.add(d);
+    allKeys.forEach(k => {
+      if (k !== closestKey) collapsed.add(k);
     });
     setCollapsedDays(collapsed);
   }, [matches, selectedTournament]);
