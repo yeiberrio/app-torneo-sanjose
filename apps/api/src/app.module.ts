@@ -16,6 +16,7 @@ import { CaslModule } from './casl/casl.module';
 import { SanctionsModule } from './sanctions/sanctions.module';
 import { NewsModule } from './news/news.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { UploadsModule } from './uploads/uploads.module';
     SanctionsModule,
     NewsModule,
     UploadsModule,
+    RolesModule,
   ],
 })
 export class AppModule {}

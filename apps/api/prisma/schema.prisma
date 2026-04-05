@@ -195,6 +195,8 @@ model User {
   address             String?
 
   role                Role         @default(CITIZEN)
+  customRoleId        String?
+  customRole          CustomRole?  @relation(fields: [customRoleId], references: [id])
   status              UserStatus   @default(PENDING_EMAIL)
   roleJustification   String?
 
@@ -493,6 +495,48 @@ model TournamentTiebreaker {
 
   @@unique([tournamentId, roundId, criteria])
   @@map("tournament_tiebreakers")
+}
+
+model CustomRole {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  permissions RolePermission[]
+  users       User[]
+
+  @@map("custom_roles")
+}
+
+model RolePermission {
+  id         String     @id @default(cuid())
+  roleId     String
+  role       CustomRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  module     String
+  viewModule Boolean    @default(false)
+  create     Boolean    @default(false)
+  read       Boolean    @default(false)
+  edit       Boolean    @default(false)
+  delete     Boolean    @default(false)
+
+  @@unique([roleId, module])
+  @@map("role_permissions")
+}
+
+model DefaultRolePermission {
+  id         String  @id @default(cuid())
+  role       Role
+  module     String
+  viewModule Boolean @default(false)
+  create     Boolean @default(false)
+  read       Boolean @default(false)
+  edit       Boolean @default(false)
+  delete     Boolean @default(false)
+
+  @@unique([role, module])
+  @@map("default_role_permissions")
 }
 
 model AuditLog {
