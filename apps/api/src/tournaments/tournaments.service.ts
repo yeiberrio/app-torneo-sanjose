@@ -38,7 +38,7 @@ export class TournamentsService {
       where: { id },
       include: {
         teams: { include: { team: true } },
-        matches: { orderBy: { scheduledAt: 'asc' } },
+        matches: { where: { deletedAt: null }, orderBy: { scheduledAt: 'asc' } },
         rounds: { orderBy: { roundNumber: 'asc' }, include: { tiebreakers: { orderBy: { priority: 'asc' } } } },
         tiebreakers: { orderBy: { priority: 'asc' } },
       },
@@ -73,7 +73,7 @@ export class TournamentsService {
     });
 
     const matches = await this.prisma.match.findMany({
-      where: { tournamentId, status: 'FINISHED' },
+      where: { tournamentId, status: 'FINISHED', deletedAt: null },
     });
 
     const standings = teams.map((tt) => {
@@ -111,11 +111,12 @@ export class TournamentsService {
   async generateFixture(tournamentId: string, dto: GenerateFixtureDto) {
     const tournament = await this.prisma.tournament.findUnique({
       where: { id: tournamentId },
-      include: { teams: { include: { team: true } }, matches: true },
+      include: { teams: { include: { team: true } }, matches: { select: { id: true, deletedAt: true } } },
     });
     if (!tournament) throw new NotFoundException('Torneo no encontrado');
 
-    if (tournament.matches.length > 0) {
+    const activeMatches = tournament.matches.filter(m => !(m as any).deletedAt);
+    if (activeMatches.length > 0) {
       throw new BadRequestException('El torneo ya tiene partidos programados. Elimine los partidos existentes antes de generar un nuevo fixture.');
     }
 
@@ -174,22 +175,75 @@ export class TournamentsService {
     };
   }
 
-  async deleteFixture(tournamentId: string) {
+  async deleteFixture(tournamentId: string, userId: string) {
     const tournament = await this.prisma.tournament.findUnique({ where: { id: tournamentId } });
     if (!tournament) throw new NotFoundException('Torneo no encontrado');
 
-    const inProgress = await this.prisma.match.count({
-      where: { tournamentId, status: { in: ['IN_PROGRESS', 'HALFTIME', 'FINISHED'] } },
+    // Soft delete: move matches to trash instead of hard delete
+    const matchesToDelete = await this.prisma.match.findMany({
+      where: { tournamentId, deletedAt: null, status: { in: ['SCHEDULED', 'POSTPONED', 'CANCELLED'] } },
+      select: { id: true },
     });
-    if (inProgress > 0) {
-      throw new BadRequestException('No se puede eliminar el fixture: hay partidos en curso o finalizados.');
+
+    if (matchesToDelete.length === 0) {
+      throw new BadRequestException('No hay partidos eliminables (programados, aplazados o cancelados).');
     }
 
-    const deleted = await this.prisma.match.deleteMany({
-      where: { tournamentId, status: { in: ['SCHEDULED', 'POSTPONED', 'CANCELLED'] } },
+    await this.prisma.match.updateMany({
+      where: { id: { in: matchesToDelete.map(m => m.id) } },
+      data: { deletedAt: new Date(), deletedBy: userId },
     });
 
-    return { message: `${deleted.count} partidos eliminados`, matchesDeleted: deleted.count };
+    // Audit log
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'DELETE_FIXTURE',
+        entity: 'Tournament',
+        entityId: tournamentId,
+        oldValue: { tournamentName: tournament.name, matchesDeleted: matchesToDelete.length },
+      },
+    });
+
+    return { message: `${matchesToDelete.length} partidos movidos a la papelera`, matchesDeleted: matchesToDelete.length };
+  }
+
+  async restoreFixture(tournamentId: string, userId: string) {
+    const tournament = await this.prisma.tournament.findUnique({ where: { id: tournamentId } });
+    if (!tournament) throw new NotFoundException('Torneo no encontrado');
+
+    const trashed = await this.prisma.match.findMany({
+      where: { tournamentId, deletedAt: { not: null } },
+      select: { id: true },
+    });
+
+    if (trashed.length === 0) {
+      throw new BadRequestException('No hay partidos en la papelera para restaurar.');
+    }
+
+    await this.prisma.match.updateMany({
+      where: { id: { in: trashed.map(m => m.id) } },
+      data: { deletedAt: null, deletedBy: null },
+    });
+
+    // Audit log
+    await this.prisma.auditLog.create({
+      data: {
+        userId,
+        action: 'RESTORE_FIXTURE',
+        entity: 'Tournament',
+        entityId: tournamentId,
+        newValue: { tournamentName: tournament.name, matchesRestored: trashed.length },
+      },
+    });
+
+    return { message: `${trashed.length} partidos restaurados`, matchesRestored: trashed.length };
+  }
+
+  async getTrashedMatchesCount(tournamentId: string): Promise<number> {
+    return this.prisma.match.count({
+      where: { tournamentId, deletedAt: { not: null } },
+    });
   }
 
   // --- Algoritmos de fixture ---

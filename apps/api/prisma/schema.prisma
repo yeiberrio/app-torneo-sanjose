@@ -382,6 +382,8 @@ model Match {
   round          TournamentRound? @relation(fields: [roundId], references: [id])
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
+  deletedBy      String?
 
   events         MatchEvent[]
   playerStats    MatchPlayerStat[]

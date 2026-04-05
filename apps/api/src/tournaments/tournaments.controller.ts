@@ -103,9 +103,24 @@ export class TournamentsController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, PoliciesGuard)
   @CheckPolicies({ action: 'update', subject: 'Tournament' })
-  @ApiOperation({ summary: 'Eliminar fixture (solo partidos no jugados)' })
-  deleteFixture(@Param('id') id: string) {
-    return this.tournamentsService.deleteFixture(id);
+  @ApiOperation({ summary: 'Eliminar fixture (mover a papelera)' })
+  deleteFixture(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.tournamentsService.deleteFixture(id, userId);
+  }
+
+  @Post(':id/fixture/restore')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Restaurar fixture desde papelera' })
+  restoreFixture(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.tournamentsService.restoreFixture(id, userId);
+  }
+
+  @Get(':id/fixture/trash-count')
+  @ApiOperation({ summary: 'Cantidad de partidos en papelera' })
+  getTrashedMatchesCount(@Param('id') id: string) {
+    return this.tournamentsService.getTrashedMatchesCount(id);
   }
 
   @Get(':id/rounds')

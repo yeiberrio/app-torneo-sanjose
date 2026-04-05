@@ -105,6 +105,10 @@ export default function TournamentDetailPage() {
   // Delete confirmations
   const [deleteFixtureOpen, setDeleteFixtureOpen] = useState(false);
   const [deletingFixture, setDeletingFixture] = useState(false);
+  const [generateFixtureConfirmOpen, setGenerateFixtureConfirmOpen] = useState(false);
+  const [restoreFixtureOpen, setRestoreFixtureOpen] = useState(false);
+  const [restoringFixture, setRestoringFixture] = useState(false);
+  const [trashedMatchesCount, setTrashedMatchesCount] = useState(0);
   const [deleteRoundTarget, setDeleteRoundTarget] = useState<string | null>(null);
   const [deletingRound, setDeletingRound] = useState(false);
 
@@ -137,10 +141,18 @@ export default function TournamentDetailPage() {
     }).catch(() => {});
   };
 
+  const fetchTrashedCount = () => {
+    if (!tournamentId) return;
+    api.get(`/tournaments/${tournamentId}/fixture/trash-count`).then((res) => {
+      setTrashedMatchesCount(typeof res.data === "number" ? res.data : 0);
+    }).catch(() => {});
+  };
+
   useEffect(() => {
     fetchTournament();
     fetchRounds();
     fetchTiebreakers();
+    fetchTrashedCount();
     api.get("/teams?limit=100").then((res) => setAllTeams(res.data.data || [])).catch(() => {});
   }, [tournamentId]);
 
@@ -167,7 +179,13 @@ export default function TournamentDetailPage() {
     }
   };
 
+  const handleGenerateFixtureConfirm = () => {
+    // Show confirmation before generating
+    setGenerateFixtureConfirmOpen(true);
+  };
+
   const handleGenerateFixture = async () => {
+    setGenerateFixtureConfirmOpen(false);
     setFixtureLoading(true);
     try {
       const res = await api.post(`/tournaments/${tournamentId}/generate-fixture`, {
@@ -179,7 +197,9 @@ export default function TournamentDetailPage() {
       });
       toast.success(res.data.message || "Fixture generado exitosamente");
       setFixtureDialogOpen(false);
+      setMatchDaysInitialized(false);
       fetchTournament();
+      fetchTrashedCount();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al generar fixture");
     } finally {
@@ -187,13 +207,31 @@ export default function TournamentDetailPage() {
     }
   };
 
+  const handleRestoreFixture = async () => {
+    setRestoringFixture(true);
+    try {
+      const res = await api.post(`/tournaments/${tournamentId}/fixture/restore`);
+      toast.success(res.data.message || "Fixture restaurado");
+      setRestoreFixtureOpen(false);
+      setMatchDaysInitialized(false);
+      fetchTournament();
+      fetchTrashedCount();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al restaurar fixture");
+    } finally {
+      setRestoringFixture(false);
+    }
+  };
+
   const handleDeleteFixture = async () => {
     setDeletingFixture(true);
     try {
       const res = await api.delete(`/tournaments/${tournamentId}/fixture`);
-      toast.success(res.data.message || "Fixture eliminado");
+      toast.success(res.data.message || "Fixture movido a la papelera");
       setDeleteFixtureOpen(false);
+      setMatchDaysInitialized(false);
       fetchTournament();
+      fetchTrashedCount();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al eliminar fixture");
     } finally {
@@ -621,7 +659,7 @@ export default function TournamentDetailPage() {
                           <Label>Sede por defecto (opcional)</Label>
                           <Input value={fixtureConfig.defaultVenue} onChange={(e) => setFixtureConfig(prev => ({ ...prev, defaultVenue: e.target.value }))} placeholder="Ej: Cancha Municipal" />
                         </div>
-                        <Button onClick={handleGenerateFixture} disabled={fixtureLoading} className="w-full">
+                        <Button onClick={handleGenerateFixtureConfirm} disabled={fixtureLoading} className="w-full">
                           {fixtureLoading ? "Generando..." : "Generar Fixture"}
                         </Button>
                       </div>
@@ -631,6 +669,11 @@ export default function TournamentDetailPage() {
                 {tournament.matches?.length > 0 && (
                   <Button size="sm" variant="destructive" onClick={() => setDeleteFixtureOpen(true)}>
                     <Trash2 className="h-4 w-4 mr-1" />Eliminar Fixture
+                  </Button>
+                )}
+                {trashedMatchesCount > 0 && (
+                  <Button size="sm" variant="outline" onClick={() => setRestoreFixtureOpen(true)}>
+                    Restaurar ({trashedMatchesCount})
                   </Button>
                 )}
                 <Button size="sm" asChild>
@@ -944,14 +987,37 @@ export default function TournamentDetailPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Generate fixture confirmation */}
+      <Dialog open={generateFixtureConfirmOpen} onOpenChange={setGenerateFixtureConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmar generacion de fixture</DialogTitle>
+            <DialogDescription>
+              ¿Desea generar el fixture para el torneo <strong>"{tournament.name}"</strong>?
+              Se crearan los partidos automaticamente segun la configuracion seleccionada
+              ({tournament.teams?.length || 0} equipos, {typeLabels[tournament.type] || tournament.type}).
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGenerateFixtureConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleGenerateFixture} disabled={fixtureLoading}>
+              {fixtureLoading ? "Generando..." : "Si, generar fixture"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete fixture confirmation */}
       <Dialog open={deleteFixtureOpen} onOpenChange={setDeleteFixtureOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Eliminar fixture</DialogTitle>
             <DialogDescription>
-              ¿Desea eliminar todos los partidos no jugados del torneo <strong>"{tournament.name}"</strong>?
-              Los partidos ya finalizados no se veran afectados.
+              ¿Desea eliminar los partidos no jugados del torneo <strong>"{tournament.name}"</strong>?
+              Los partidos seran movidos a la papelera y podra restaurarlos despues.
+              Los partidos finalizados o en curso no se veran afectados.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -960,6 +1026,27 @@ export default function TournamentDetailPage() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteFixture} disabled={deletingFixture}>
               {deletingFixture ? "Eliminando..." : "Si, eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Restore fixture confirmation */}
+      <Dialog open={restoreFixtureOpen} onOpenChange={setRestoreFixtureOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Restaurar fixture</DialogTitle>
+            <DialogDescription>
+              ¿Desea restaurar los <strong>{trashedMatchesCount} partidos</strong> de la papelera del torneo <strong>"{tournament.name}"</strong>?
+              Los partidos volveran a aparecer en el fixture.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRestoreFixtureOpen(false)} disabled={restoringFixture}>
+              Cancelar
+            </Button>
+            <Button onClick={handleRestoreFixture} disabled={restoringFixture}>
+              {restoringFixture ? "Restaurando..." : "Si, restaurar"}
             </Button>
           </DialogFooter>
         </DialogContent>

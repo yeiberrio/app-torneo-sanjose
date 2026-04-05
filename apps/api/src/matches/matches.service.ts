@@ -21,7 +21,8 @@ export class MatchesService {
 
   async findAll(tournamentId?: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
-    const where = tournamentId ? { tournamentId } : {};
+    const where: any = { deletedAt: null };
+    if (tournamentId) where.tournamentId = tournamentId;
     const [matches, total] = await Promise.all([
       this.prisma.match.findMany({
         where, skip, take: limit,
