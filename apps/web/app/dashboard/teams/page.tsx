@@ -203,7 +203,7 @@ export default function TeamsPage() {
             return t.name.toLowerCase().includes(q) || (t.city || "").toLowerCase().includes(q);
           }).map((team) => (
             <a key={team.id} href={`/dashboard/teams/detalle?id=${team.id}`} style={{ textDecoration: "none", color: "inherit" }}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card className="card-hover cursor-pointer">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4">
                     {/* Logo or initials */}

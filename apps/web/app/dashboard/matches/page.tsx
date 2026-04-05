@@ -273,7 +273,7 @@ export default function MatchesPage() {
                   <span className="font-semibold text-sm">{group.label}</span>
                   <div className="flex items-center gap-2 ml-auto">
                     <span className="text-xs text-muted-foreground">{group.matches.length} partido(s)</span>
-                    {dayInProgress && <Badge className="text-xs bg-green-100 text-green-800">En juego</Badge>}
+                    {dayInProgress && <Badge className="text-xs bg-green-100 text-green-800 badge-live">En juego</Badge>}
                     {dayFinished && !dayInProgress && <Badge variant="secondary" className="text-xs">Completada</Badge>}
                   </div>
                 </button>
@@ -285,7 +285,7 @@ export default function MatchesPage() {
                       const status = statusLabels[m.status] || { label: m.status, className: "bg-gray-100 text-gray-800" };
                       return (
                         <Link key={m.id} href={`/dashboard/matches/detalle?id=${m.id}`}>
-                          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                          <Card className="card-hover cursor-pointer">
                             <CardContent className="p-3">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3 flex-1">

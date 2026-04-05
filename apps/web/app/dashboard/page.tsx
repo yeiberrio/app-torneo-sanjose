@@ -118,14 +118,14 @@ export default function DashboardPage() {
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {quickLinks.map((link) => {
+        {quickLinks.map((link, i) => {
           const Icon = link.icon;
           const count = stats[link.key as keyof typeof stats] || 0;
           return (
             <Link key={link.href} href={link.href}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card className="card-hover cursor-pointer animate-slide-up" style={{ animationDelay: `${i * 0.08}s`, animationFillMode: "backwards" }}>
                 <CardContent className="p-4 flex items-center gap-4">
-                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${link.color}`}>
+                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${link.color} transition-transform group-hover:scale-110`}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
@@ -162,7 +162,7 @@ export default function DashboardPage() {
 
       {/* Tournament summary */}
       {summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 animate-fade-in">
           <Card>
             <CardContent className="p-4 text-center">
               <p className="text-2xl font-bold">{summary.totalTeams}</p>

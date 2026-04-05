@@ -469,7 +469,9 @@ export default function MatchDetailPage() {
 
             <div className="text-center">
               <div className="text-5xl font-bold text-primary">
-                {match.scoreA ?? 0} - {match.scoreB ?? 0}
+                <span key={`a-${match.scoreA}`} className="score-flash inline-block">{match.scoreA ?? 0}</span>
+                {" - "}
+                <span key={`b-${match.scoreB}`} className="score-flash inline-block">{match.scoreB ?? 0}</span>
               </div>
               {match.venue && (
                 <p className="text-xs text-muted-foreground mt-2">{match.venue}</p>

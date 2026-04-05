@@ -111,7 +111,7 @@ export default function TournamentsPage() {
           {tournaments.map((t) => (
             <Card
               key={t.id}
-              className="hover:shadow-md transition-shadow relative group"
+              className="card-hover relative group"
             >
               <Link href={`/dashboard/tournaments/detalle?id=${t.id}`}>
                 <CardHeader>

@@ -70,9 +70,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      {/* Sidebar overlay */}
+      {/* Sidebar overlay with fade */}
       {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40" onClick={() => setSidebarOpen(false)} />
+        <div className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40 animate-fade-in" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
@@ -101,10 +101,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 key={item.href}
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm mb-0.5 transition-all ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm mb-0.5 transition-all duration-200 ${
                   isActive
-                    ? "bg-gradient-to-r from-green-500/20 to-green-600/10 text-green-400 border border-green-500/20 shadow-sm"
-                    : "text-white/50 hover:bg-white/5 hover:text-white/80 border border-transparent"
+                    ? "bg-gradient-to-r from-green-500/20 to-green-600/10 text-green-400 border border-green-500/20 shadow-sm scale-[1.02]"
+                    : "text-white/50 hover:bg-white/5 hover:text-white/80 border border-transparent hover:translate-x-1"
                 }`}
               >
                 <Icon className={`h-4 w-4 ${isActive ? "text-green-400" : ""}`} />
@@ -140,7 +140,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main content */}
       <main className="lg:ml-64 pt-14 lg:pt-0 min-h-screen">
-        <div className="p-6">
+        <div className="p-6 animate-fade-in">
           {children}
         </div>
       </main>
