@@ -103,6 +103,10 @@ export default function TournamentDetailPage() {
   const [exporting, setExporting] = useState(false);
 
   // Delete confirmations
+  // Finalize tournament double confirmation
+  const [finalizeStep, setFinalizeStep] = useState(0); // 0=closed, 1=first confirm, 2=second confirm
+  const [finalizing, setFinalizing] = useState(false);
+
   const [deleteFixtureOpen, setDeleteFixtureOpen] = useState(false);
   const [deletingFixture, setDeletingFixture] = useState(false);
   const [generateFixtureConfirmOpen, setGenerateFixtureConfirmOpen] = useState(false);
@@ -275,12 +279,31 @@ export default function TournamentDetailPage() {
   };
 
   const handleStatusChange = async (newStatus: string) => {
+    // For FINISHED, require double confirmation
+    if (newStatus === "FINISHED") {
+      setFinalizeStep(1);
+      return;
+    }
     try {
       await api.patch(`/tournaments/${tournamentId}`, { status: newStatus });
       toast.success("Estado actualizado");
       fetchTournament();
     } catch {
       toast.error("Error al cambiar estado");
+    }
+  };
+
+  const handleFinalizeTournament = async () => {
+    setFinalizing(true);
+    try {
+      await api.patch(`/tournaments/${tournamentId}`, { status: "FINISHED" });
+      toast.success("Torneo finalizado exitosamente");
+      setFinalizeStep(0);
+      fetchTournament();
+    } catch {
+      toast.error("Error al finalizar torneo");
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -1047,6 +1070,41 @@ export default function TournamentDetailPage() {
             </Button>
             <Button onClick={handleRestoreFixture} disabled={restoringFixture}>
               {restoringFixture ? "Restaurando..." : "Si, restaurar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Finalize tournament - double confirmation */}
+      <Dialog open={finalizeStep === 1} onOpenChange={(open) => { if (!open) setFinalizeStep(0); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finalizar torneo</DialogTitle>
+            <DialogDescription>
+              ¿Desea finalizar el torneo <strong>"{tournament.name}"</strong>?
+              Esta accion marcara el torneo como completado. Los partidos pendientes no se veran afectados pero no se podran generar nuevos fixtures.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFinalizeStep(0)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => setFinalizeStep(2)}>Si, continuar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={finalizeStep === 2} onOpenChange={(open) => { if (!open) setFinalizeStep(0); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmacion final</DialogTitle>
+            <DialogDescription>
+              Esta es una accion importante. Confirme por segunda vez que desea <strong>finalizar definitivamente</strong> el torneo <strong>"{tournament.name}"</strong>.
+              Una vez finalizado, el torneo pasara a estado "Finalizado".
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFinalizeStep(0)} disabled={finalizing}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleFinalizeTournament} disabled={finalizing}>
+              {finalizing ? "Finalizando..." : "Confirmar y finalizar torneo"}
             </Button>
           </DialogFooter>
         </DialogContent>

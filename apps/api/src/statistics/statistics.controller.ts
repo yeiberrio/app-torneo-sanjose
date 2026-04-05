@@ -31,6 +31,12 @@ export class StatisticsController {
     return this.statisticsService.getTopCards(tournamentId, Number(limit) || 20);
   }
 
+  @Get(':tournamentId/fair-play')
+  @ApiOperation({ summary: 'Tabla de juego limpio por equipo' })
+  getFairPlay(@Param('tournamentId') tournamentId: string) {
+    return this.statisticsService.getFairPlay(tournamentId);
+  }
+
   @Get(':tournamentId/summary')
   @ApiOperation({ summary: 'Resumen del torneo' })
   getSummary(@Param('tournamentId') tournamentId: string) {

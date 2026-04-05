@@ -279,6 +279,22 @@ export class StatisticsService {
     return result.slice(0, limit);
   }
 
+  async getFairPlay(tournamentId: string) {
+    const standings = await this.getStandings(tournamentId);
+    return standings
+      .map(s => ({
+        teamId: s.teamId,
+        teamName: s.teamName,
+        logoUrl: s.logoUrl,
+        played: s.played,
+        yellowCards: s.yellowCards,
+        redCards: s.redCards,
+        totalCards: s.yellowCards + s.redCards * 3,
+        avgCardsPerMatch: s.played > 0 ? +((s.yellowCards + s.redCards * 3) / s.played).toFixed(2) : 0,
+      }))
+      .sort((a, b) => a.totalCards - b.totalCards);
+  }
+
   async getTournamentSummary(tournamentId: string) {
     const [totalMatches, finishedMatches, totalTeams, totalPlayers] = await Promise.all([
       this.prisma.match.count({ where: { tournamentId } }),
