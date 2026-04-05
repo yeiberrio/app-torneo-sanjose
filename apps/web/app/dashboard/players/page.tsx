@@ -57,7 +57,7 @@ export default function PlayersPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
   const fetchPlayers = () => {
-    api.get("/players").then((res) => {
+    api.get("/players?limit=1000").then((res) => {
       setPlayers(res.data.data || []);
     }).catch(() => {}).finally(() => setLoading(false));
   };

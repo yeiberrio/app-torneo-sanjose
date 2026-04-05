@@ -46,7 +46,7 @@ export default function TeamsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchTeams = () => {
-    api.get("/teams").then((res) => {
+    api.get("/teams?limit=500").then((res) => {
       setTeams(res.data.data || []);
     }).catch(() => {}).finally(() => setLoading(false));
   };
