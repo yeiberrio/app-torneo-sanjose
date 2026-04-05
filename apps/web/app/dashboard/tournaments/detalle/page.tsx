@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2, ListOrdered, Settings2, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2, ListOrdered, Settings2, GripVertical, Edit, Check } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -95,6 +95,10 @@ export default function TournamentDetailPage() {
   const [tiebreakerDialogOpen, setTiebreakerDialogOpen] = useState(false);
   const [tiebreakerList, setTiebreakerList] = useState<{ criteria: string; priority: number }[]>([]);
 
+  // Edit tournament name state
+  const [editingName, setEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState("");
+
   // Match day filter
   const [filterDay, setFilterDay] = useState<string>("all");
 
@@ -177,6 +181,21 @@ export default function TournamentDetailPage() {
       fetchTournament();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al eliminar fixture");
+    }
+  };
+
+  const handleSaveName = async () => {
+    if (!editNameValue.trim() || editNameValue.trim() === tournament?.name) {
+      setEditingName(false);
+      return;
+    }
+    try {
+      await api.patch(`/tournaments/${tournamentId}`, { name: editNameValue.trim() });
+      toast.success("Nombre del torneo actualizado");
+      setEditingName(false);
+      fetchTournament();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al actualizar nombre");
     }
   };
 
@@ -287,7 +306,37 @@ export default function TournamentDetailPage() {
           <Link href="/dashboard/tournaments"><ArrowLeft className="h-5 w-5" /></Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold">{tournament.name}</h1>
+          <div className="flex items-center gap-2">
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={editNameValue}
+                  onChange={(e) => setEditNameValue(e.target.value)}
+                  className="text-2xl font-bold h-10"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveName();
+                    if (e.key === "Escape") setEditingName(false);
+                  }}
+                />
+                <Button size="icon" variant="ghost" onClick={handleSaveName}>
+                  <Check className="h-4 w-4 text-green-600" />
+                </Button>
+                <Button size="icon" variant="ghost" onClick={() => setEditingName(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold">{tournament.name}</h1>
+                {canManage && (
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditNameValue(tournament.name); setEditingName(true); }}>
+                    <Edit className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
           <div className="flex items-center gap-2 mt-1">
             <Badge variant="outline" className={status.className}>{status.label}</Badge>
             <span className="text-sm text-muted-foreground">{typeLabels[tournament.type] || tournament.type}</span>

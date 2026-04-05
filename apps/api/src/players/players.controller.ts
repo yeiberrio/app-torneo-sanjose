@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } f
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { PlayersService } from './players.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
+import { UpdatePlayerDto } from './dto/update-player.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PoliciesGuard, CheckPolicies } from '../casl/policies.guard';
 
@@ -46,7 +47,7 @@ export class PlayersController {
   @UseGuards(JwtAuthGuard, PoliciesGuard)
   @CheckPolicies({ action: 'update', subject: 'Player' })
   @ApiOperation({ summary: 'Actualizar jugador' })
-  update(@Param('id') id: string, @Body() dto: Partial<CreatePlayerDto>) {
+  update(@Param('id') id: string, @Body() dto: UpdatePlayerDto) {
     return this.playersService.update(id, dto);
   }
 

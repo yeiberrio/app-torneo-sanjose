@@ -92,6 +92,34 @@ export class MatchesService {
 
       console.log('[addEvent] matchId:', matchId, 'dto:', JSON.stringify(dto), 'userId:', userId, 'cleanPlayerId:', playerId);
 
+      // Validate card limits per player per match
+      if (playerId && ['YELLOW_CARD', 'BLUE_CARD', 'RED_CARD'].includes(dto.type)) {
+        const existingEvents = await this.prisma.matchEvent.findMany({
+          where: { matchId, playerId },
+        });
+
+        if (dto.type === 'YELLOW_CARD') {
+          const yellowCount = existingEvents.filter(e => e.type === 'YELLOW_CARD').length;
+          if (yellowCount >= 2) {
+            throw new BadRequestException('Un jugador no puede recibir mas de 2 tarjetas amarillas por partido.');
+          }
+        }
+
+        if (dto.type === 'BLUE_CARD') {
+          const blueCount = existingEvents.filter(e => e.type === 'BLUE_CARD').length;
+          if (blueCount >= 1) {
+            throw new BadRequestException('Un jugador no puede recibir mas de 1 tarjeta azul por partido.');
+          }
+        }
+
+        if (dto.type === 'RED_CARD') {
+          const redCount = existingEvents.filter(e => e.type === 'RED_CARD').length;
+          if (redCount >= 1) {
+            throw new BadRequestException('Un jugador no puede recibir mas de 1 tarjeta roja por partido.');
+          }
+        }
+      }
+
       // Check if player is blocked by active sanctions
       if (playerId) {
         const matchData = await this.prisma.match.findUnique({

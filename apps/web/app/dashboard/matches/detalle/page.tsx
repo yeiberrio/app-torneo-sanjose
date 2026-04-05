@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { ArrowLeft, Plus, Clock, CircleDot, Wifi, WifiOff, CalendarClock, Edit, Trash2, ShieldAlert, ShieldBan } from "lucide-react";
+import { ArrowLeft, Plus, Clock, CircleDot, Wifi, WifiOff, CalendarClock, Edit, Trash2, ShieldAlert, ShieldBan, Users } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -31,6 +31,7 @@ const eventTypeLabels: Record<string, { label: string; icon: string }> = {
   GOAL: { label: "Gol", icon: "⚽" },
   OWN_GOAL: { label: "Autogol", icon: "⚽🔴" },
   YELLOW_CARD: { label: "Tarjeta Amarilla", icon: "🟨" },
+  BLUE_CARD: { label: "Tarjeta Azul", icon: "🟦" },
   RED_CARD: { label: "Tarjeta Roja", icon: "🟥" },
   YELLOW_RED_CARD: { label: "Doble Amarilla", icon: "🟨🟥" },
   SUBSTITUTION_IN: { label: "Entra", icon: "🔼" },
@@ -71,6 +72,24 @@ export default function MatchDetailPage() {
     minute: "",
     description: "",
   });
+
+  // Player-centric event entry state
+  const [playerEventOpen, setPlayerEventOpen] = useState(false);
+  const [selectedTeamForPlayer, setSelectedTeamForPlayer] = useState("");
+  const [selectedPlayerForEvents, setSelectedPlayerForEvents] = useState("");
+  const [playerEventForm, setPlayerEventForm] = useState({
+    goals: 0,
+    ownGoals: 0,
+    yellowCards: 0,
+    blueCards: 0,
+    redCards: 0,
+    fouls: 0,
+    penaltyScored: 0,
+    penaltyMissed: 0,
+    minuteGoals: "" as string,
+    minuteCards: "" as string,
+  });
+  const [savingPlayerEvents, setSavingPlayerEvents] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleForm, setRescheduleForm] = useState({
@@ -201,6 +220,108 @@ export default function MatchDetailPage() {
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al registrar evento");
     }
+  };
+
+  const getPlayerExistingEvents = () => {
+    if (!match?.events || !selectedPlayerForEvents) return { yellowCards: 0, blueCards: 0, redCards: 0 };
+    const playerEvents = match.events.filter((e: any) => e.playerId === selectedPlayerForEvents);
+    return {
+      yellowCards: playerEvents.filter((e: any) => e.type === "YELLOW_CARD").length,
+      blueCards: playerEvents.filter((e: any) => e.type === "BLUE_CARD").length,
+      redCards: playerEvents.filter((e: any) => e.type === "RED_CARD").length,
+    };
+  };
+
+  const handleSavePlayerEvents = async () => {
+    if (!selectedPlayerForEvents || !selectedTeamForPlayer) {
+      toast.error("Selecciona equipo y jugador");
+      return;
+    }
+    setSavingPlayerEvents(true);
+    try {
+      const events: { type: string; minute?: number }[] = [];
+
+      for (let i = 0; i < playerEventForm.goals; i++) {
+        events.push({ type: "GOAL" });
+      }
+      for (let i = 0; i < playerEventForm.ownGoals; i++) {
+        events.push({ type: "OWN_GOAL" });
+      }
+      for (let i = 0; i < playerEventForm.yellowCards; i++) {
+        events.push({ type: "YELLOW_CARD" });
+      }
+      for (let i = 0; i < playerEventForm.blueCards; i++) {
+        events.push({ type: "BLUE_CARD" });
+      }
+      for (let i = 0; i < playerEventForm.redCards; i++) {
+        events.push({ type: "RED_CARD" });
+      }
+      for (let i = 0; i < playerEventForm.fouls; i++) {
+        events.push({ type: "FOUL" });
+      }
+      for (let i = 0; i < playerEventForm.penaltyScored; i++) {
+        events.push({ type: "PENALTY_SCORED" });
+      }
+      for (let i = 0; i < playerEventForm.penaltyMissed; i++) {
+        events.push({ type: "PENALTY_MISSED" });
+      }
+
+      if (events.length === 0) {
+        toast.error("No hay eventos para registrar");
+        setSavingPlayerEvents(false);
+        return;
+      }
+
+      let errorCount = 0;
+      for (const ev of events) {
+        try {
+          await api.post(`/matches/${matchId}/events`, {
+            teamId: selectedTeamForPlayer,
+            playerId: selectedPlayerForEvents,
+            type: ev.type,
+            minute: ev.minute || undefined,
+          });
+        } catch (err: any) {
+          errorCount++;
+          toast.error(err.response?.data?.message || `Error al registrar ${ev.type}`);
+        }
+      }
+
+      if (errorCount === 0) {
+        toast.success(`${events.length} evento(s) registrados correctamente`);
+      } else {
+        toast.warning(`${events.length - errorCount} de ${events.length} eventos registrados`);
+      }
+
+      fetchMatch();
+      resetPlayerEventForm();
+    } catch {
+      toast.error("Error al guardar eventos");
+    } finally {
+      setSavingPlayerEvents(false);
+    }
+  };
+
+  const resetPlayerEventForm = () => {
+    setPlayerEventForm({
+      goals: 0, ownGoals: 0, yellowCards: 0, blueCards: 0,
+      redCards: 0, fouls: 0, penaltyScored: 0, penaltyMissed: 0,
+      minuteGoals: "", minuteCards: "",
+    });
+  };
+
+  const handleSaveAndSelectAnother = async () => {
+    await handleSavePlayerEvents();
+    setSelectedPlayerForEvents("");
+    resetPlayerEventForm();
+  };
+
+  const handleSaveAndGoBack = async () => {
+    await handleSavePlayerEvents();
+    setPlayerEventOpen(false);
+    setSelectedPlayerForEvents("");
+    setSelectedTeamForPlayer("");
+    resetPlayerEventForm();
   };
 
   const handleDeleteEvent = async (eventId: string) => {
@@ -441,13 +562,172 @@ export default function MatchDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Events timeline + Add event button */}
+      {/* Events timeline + Add event buttons */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Eventos del Partido</h2>
         {canManageEvents && match.status !== "CANCELLED" && (
+          <div className="flex gap-2">
+            <Dialog open={playerEventOpen} onOpenChange={(open) => {
+              setPlayerEventOpen(open);
+              if (!open) { setSelectedPlayerForEvents(""); setSelectedTeamForPlayer(""); resetPlayerEventForm(); }
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="default"><Users className="h-4 w-4 mr-2" />Registrar por Jugador</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Registrar Eventos por Jugador</DialogTitle>
+                  <DialogDescription>Selecciona un jugador y registra todos sus eventos del partido.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {/* Team selector */}
+                  <div>
+                    <Label>Equipo *</Label>
+                    <Select value={selectedTeamForPlayer} onValueChange={(v) => { setSelectedTeamForPlayer(v); setSelectedPlayerForEvents(""); resetPlayerEventForm(); }}>
+                      <SelectTrigger><SelectValue placeholder="Seleccionar equipo" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={match.teamAId}>{teamAName}</SelectItem>
+                        <SelectItem value={match.teamBId}>{teamBName}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Player selector */}
+                  {selectedTeamForPlayer && (
+                    <div>
+                      <Label>Jugador *</Label>
+                      <Select value={selectedPlayerForEvents} onValueChange={(v) => { setSelectedPlayerForEvents(v); resetPlayerEventForm(); }}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar jugador" /></SelectTrigger>
+                        <SelectContent>
+                          {(selectedTeamForPlayer === match.teamAId ? playersA : playersB).map((p: any) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {blockedPlayerIds.has(p.id) ? "🚫 " : ""}#{p.jerseyNumber || "?"} {p.firstName} {p.lastName}
+                              {blockedPlayerIds.has(p.id) ? " (SANCIONADO)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Event counters when player is selected */}
+                  {selectedPlayerForEvents && (() => {
+                    const existing = getPlayerExistingEvents();
+                    const maxYellow = 2 - existing.yellowCards;
+                    const maxBlue = 1 - existing.blueCards;
+                    const maxRed = 1 - existing.redCards;
+                    const selectedPlayer = [...playersA, ...playersB].find(p => p.id === selectedPlayerForEvents);
+
+                    return (
+                      <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+                        <p className="text-sm font-medium">
+                          Eventos para #{selectedPlayer?.jerseyNumber || "?"} {selectedPlayer?.firstName} {selectedPlayer?.lastName}
+                        </p>
+
+                        {/* Show existing events for this player */}
+                        {(existing.yellowCards > 0 || existing.blueCards > 0 || existing.redCards > 0) && (
+                          <div className="text-xs text-muted-foreground bg-yellow-50 border border-yellow-200 rounded p-2">
+                            Ya registrados: {existing.yellowCards > 0 ? `${existing.yellowCards} amarilla(s) ` : ""}
+                            {existing.blueCards > 0 ? `${existing.blueCards} azul ` : ""}
+                            {existing.redCards > 0 ? `${existing.redCards} roja ` : ""}
+                          </div>
+                        )}
+
+                        {/* Goals */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">⚽ Goles</Label>
+                            <div className="flex items-center gap-2">
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, goals: Math.max(0, f.goals - 1) }))}>-</Button>
+                              <span className="w-8 text-center font-bold">{playerEventForm.goals}</span>
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, goals: f.goals + 1 }))}>+</Button>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">⚽🔴 Autogoles</Label>
+                            <div className="flex items-center gap-2">
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, ownGoals: Math.max(0, f.ownGoals - 1) }))}>-</Button>
+                              <span className="w-8 text-center font-bold">{playerEventForm.ownGoals}</span>
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, ownGoals: f.ownGoals + 1 }))}>+</Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Cards */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">🟨 Amarillas <span className="text-muted-foreground">(max {maxYellow})</span></Label>
+                            <div className="flex items-center gap-2">
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, yellowCards: Math.max(0, f.yellowCards - 1) }))}>-</Button>
+                              <span className="w-8 text-center font-bold">{playerEventForm.yellowCards}</span>
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" disabled={playerEventForm.yellowCards >= maxYellow} onClick={() => setPlayerEventForm(f => ({ ...f, yellowCards: Math.min(maxYellow, f.yellowCards + 1) }))}>+</Button>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">🟦 Azul <span className="text-muted-foreground">(max {maxBlue})</span></Label>
+                            <div className="flex items-center gap-2">
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, blueCards: Math.max(0, f.blueCards - 1) }))}>-</Button>
+                              <span className="w-8 text-center font-bold">{playerEventForm.blueCards}</span>
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" disabled={playerEventForm.blueCards >= maxBlue} onClick={() => setPlayerEventForm(f => ({ ...f, blueCards: Math.min(maxBlue, f.blueCards + 1) }))}>+</Button>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">🟥 Roja <span className="text-muted-foreground">(max {maxRed})</span></Label>
+                            <div className="flex items-center gap-2">
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, redCards: Math.max(0, f.redCards - 1) }))}>-</Button>
+                              <span className="w-8 text-center font-bold">{playerEventForm.redCards}</span>
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" disabled={playerEventForm.redCards >= maxRed} onClick={() => setPlayerEventForm(f => ({ ...f, redCards: Math.min(maxRed, f.redCards + 1) }))}>+</Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Fouls & penalties */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs">⚠️ Faltas</Label>
+                            <div className="flex items-center gap-2">
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, fouls: Math.max(0, f.fouls - 1) }))}>-</Button>
+                              <span className="w-8 text-center font-bold">{playerEventForm.fouls}</span>
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, fouls: f.fouls + 1 }))}>+</Button>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">⚽🎯 Penal anotado</Label>
+                            <div className="flex items-center gap-2">
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, penaltyScored: Math.max(0, f.penaltyScored - 1) }))}>-</Button>
+                              <span className="w-8 text-center font-bold">{playerEventForm.penaltyScored}</span>
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, penaltyScored: f.penaltyScored + 1 }))}>+</Button>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">❌ Penal fallado</Label>
+                            <div className="flex items-center gap-2">
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, penaltyMissed: Math.max(0, f.penaltyMissed - 1) }))}>-</Button>
+                              <span className="w-8 text-center font-bold">{playerEventForm.penaltyMissed}</span>
+                              <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => setPlayerEventForm(f => ({ ...f, penaltyMissed: f.penaltyMissed + 1 }))}>+</Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex gap-2 pt-2">
+                          <Button onClick={handleSaveAndSelectAnother} disabled={savingPlayerEvents} variant="outline" className="flex-1">
+                            {savingPlayerEvents ? "Guardando..." : "Guardar y otro jugador"}
+                          </Button>
+                          <Button onClick={handleSaveAndGoBack} disabled={savingPlayerEvents} className="flex-1">
+                            {savingPlayerEvents ? "Guardando..." : "Guardar y volver"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </DialogContent>
+            </Dialog>
+
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-2" />Agregar Evento</Button>
+              <Button size="sm" variant="outline"><Plus className="h-4 w-4 mr-2" />Evento individual</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -508,6 +788,7 @@ export default function MatchDetailPage() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         )}
       </div>
 

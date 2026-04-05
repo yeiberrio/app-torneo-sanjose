@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
+import { UpdatePlayerDto } from './dto/update-player.dto';
 
 @Injectable()
 export class PlayersService {
@@ -39,10 +40,13 @@ export class PlayersService {
     return player;
   }
 
-  async update(id: string, dto: Partial<CreatePlayerDto>) {
+  async update(id: string, dto: UpdatePlayerDto) {
+    const data: any = { ...dto };
+    if (dto.birthDate) data.birthDate = new Date(dto.birthDate);
+    else delete data.birthDate;
     return this.prisma.player.update({
       where: { id },
-      data: { ...dto, birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined },
+      data,
     });
   }
 
