@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2, ListOrdered, Settings2, GripVertical, Edit, Check, Download } from "lucide-react";
+import { ArrowLeft, Plus, Trophy, Users, Swords, X, Calendar, Trash2, ListOrdered, Settings2, GripVertical, Edit, Check, Download, ChevronDown, ChevronRight, Search, Filter } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
@@ -108,8 +108,13 @@ export default function TournamentDetailPage() {
   const [deleteRoundTarget, setDeleteRoundTarget] = useState<string | null>(null);
   const [deletingRound, setDeletingRound] = useState(false);
 
-  // Match day filter
+  // Match day filter & search
   const [filterDay, setFilterDay] = useState<string>("all");
+  const [matchSearch, setMatchSearch] = useState("");
+  const [matchStatusFilter, setMatchStatusFilter] = useState<string>("all");
+  const [showMatchFilters, setShowMatchFilters] = useState(false);
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
+  const [matchDaysInitialized, setMatchDaysInitialized] = useState(false);
 
   const fetchTournament = () => {
     if (!tournamentId) return;
@@ -331,9 +336,61 @@ export default function TournamentDetailPage() {
 
   // Get unique day numbers for match filter
   const dayNumbers = Array.from(new Set((tournament.matches || []).map((m: any) => m.dayNumber).filter(Boolean)) as Set<number>).sort((a, b) => a - b);
-  const filteredMatches = filterDay === "all"
-    ? (tournament.matches || [])
-    : (tournament.matches || []).filter((m: any) => String(m.dayNumber) === filterDay);
+
+  // Apply all filters
+  const filteredMatches = (tournament.matches || []).filter((m: any) => {
+    if (filterDay !== "all" && String(m.dayNumber) !== filterDay) return false;
+    if (matchStatusFilter !== "all" && m.status !== matchStatusFilter) return false;
+    if (matchSearch.trim()) {
+      const q = matchSearch.toLowerCase();
+      const teamA = tournament.teams?.find((tt: any) => tt.teamId === m.teamAId)?.team?.name || "";
+      const teamB = tournament.teams?.find((tt: any) => tt.teamId === m.teamBId)?.team?.name || "";
+      if (!teamA.toLowerCase().includes(q) && !teamB.toLowerCase().includes(q) && !(m.venue || "").toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Group filtered matches by day
+  const groupedMatchesByDay = (() => {
+    const groups = new Map<string, { label: string; matches: any[]; sortKey: number }>();
+    filteredMatches.forEach((m: any) => {
+      const key = m.dayNumber ? String(m.dayNumber) : "sin-fecha";
+      if (!groups.has(key)) {
+        groups.set(key, { label: m.dayNumber ? `Fecha ${m.dayNumber}` : "Sin fecha", matches: [], sortKey: m.dayNumber || 9999 });
+      }
+      groups.get(key)!.matches.push(m);
+    });
+    groups.forEach(g => g.matches.sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()));
+    return Array.from(groups.entries()).sort((a, b) => a[1].sortKey - b[1].sortKey);
+  })();
+
+  // Auto-initialize collapsed state: only current and next date expanded
+  if (!matchDaysInitialized && tournament.matches?.length > 0 && dayNumbers.length > 0) {
+    const expanded = new Set<string>();
+    const allMatches = tournament.matches || [];
+    let currentDay: number | null = null;
+    let nextDay: number | null = null;
+    for (const d of dayNumbers) {
+      const dayMatches = allMatches.filter((m: any) => m.dayNumber === d);
+      const hasUnfinished = dayMatches.some((m: any) => m.status !== "FINISHED" && m.status !== "CANCELLED");
+      if (hasUnfinished) {
+        if (!currentDay) currentDay = d;
+        else if (!nextDay) { nextDay = d; break; }
+      }
+    }
+    if (!currentDay) { currentDay = dayNumbers[dayNumbers.length - 1]; if (dayNumbers.length > 1) nextDay = dayNumbers[dayNumbers.length - 2]; }
+    if (currentDay) expanded.add(String(currentDay));
+    if (nextDay) expanded.add(String(nextDay));
+    expanded.add("sin-fecha");
+    const collapsed = new Set<string>();
+    dayNumbers.forEach(d => { if (!expanded.has(String(d))) collapsed.add(String(d)); });
+    setCollapsedDays(collapsed);
+    setMatchDaysInitialized(true);
+  }
+
+  const toggleMatchDay = (key: string) => {
+    setCollapsedDays(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+  };
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -501,146 +558,175 @@ export default function TournamentDetailPage() {
         </TabsContent>
 
         <TabsContent value="matches">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
-              <CardTitle>Partidos</CardTitle>
-              <div className="flex gap-2 items-center flex-wrap">
-                {dayNumbers.length > 1 && (
-                  <Select value={filterDay} onValueChange={setFilterDay}>
-                    <SelectTrigger className="w-[140px] h-8 text-xs">
-                      <SelectValue placeholder="Jornada" />
-                    </SelectTrigger>
+          {/* Action buttons */}
+          <div className="flex gap-2 items-center flex-wrap mb-3">
+            <Button size="sm" variant={showMatchFilters ? "secondary" : "outline"} onClick={() => setShowMatchFilters(!showMatchFilters)}>
+              <Filter className="h-3.5 w-3.5 mr-1" />Filtros
+            </Button>
+            {canManage && (
+              <>
+                {tournament.teams?.length >= 2 && (
+                  <Dialog open={fixtureDialogOpen} onOpenChange={setFixtureDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline">
+                        <Calendar className="h-4 w-4 mr-1" />Generar Fixture
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Generar Fixture</DialogTitle>
+                        <DialogDescription>
+                          Tipo: {typeLabels[tournament.type] || tournament.type} | {tournament.teams?.length || 0} equipos
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        {(tournament.type === "LEAGUE" || tournament.type === "GROUPS") && (
+                          <div className="space-y-2">
+                            <Label>Modalidad</Label>
+                            <Select value={fixtureConfig.legs} onValueChange={(v) => setFixtureConfig(prev => ({ ...prev, legs: v }))}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">Solo ida</SelectItem>
+                                <SelectItem value="2">Ida y vuelta</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          <Label>Fecha de inicio</Label>
+                          <Input type="date" value={fixtureConfig.startDate} onChange={(e) => setFixtureConfig(prev => ({ ...prev, startDate: e.target.value }))} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Dias entre jornadas</Label>
+                            <Input type="number" min={1} max={30} value={fixtureConfig.intervalDays} onChange={(e) => setFixtureConfig(prev => ({ ...prev, intervalDays: e.target.value }))} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Hora de partidos</Label>
+                            <Input type="time" value={fixtureConfig.matchTime} onChange={(e) => setFixtureConfig(prev => ({ ...prev, matchTime: e.target.value }))} />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Sede por defecto (opcional)</Label>
+                          <Input value={fixtureConfig.defaultVenue} onChange={(e) => setFixtureConfig(prev => ({ ...prev, defaultVenue: e.target.value }))} placeholder="Ej: Cancha Municipal" />
+                        </div>
+                        <Button onClick={handleGenerateFixture} disabled={fixtureLoading} className="w-full">
+                          {fixtureLoading ? "Generando..." : "Generar Fixture"}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
+                {tournament.matches?.length > 0 && (
+                  <Button size="sm" variant="destructive" onClick={() => setDeleteFixtureOpen(true)}>
+                    <Trash2 className="h-4 w-4 mr-1" />Eliminar Fixture
+                  </Button>
+                )}
+                <Button size="sm" asChild>
+                  <Link href={`/dashboard/matches/new`}><Plus className="h-4 w-4 mr-1" />Manual</Link>
+                </Button>
+              </>
+            )}
+            <span className="text-xs text-muted-foreground ml-auto">
+              {filteredMatches.length} partidos | {groupedMatchesByDay.length} fecha(s)
+            </span>
+          </div>
+
+          {/* Filters panel */}
+          {showMatchFilters && (
+            <Card className="mb-3">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-[180px]">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input placeholder="Buscar equipo o sede..." value={matchSearch} onChange={(e) => setMatchSearch(e.target.value)} className="pl-8 h-8 text-xs" />
+                  </div>
+                  {dayNumbers.length > 1 && (
+                    <Select value={filterDay} onValueChange={setFilterDay}>
+                      <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="Fecha" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas</SelectItem>
+                        {dayNumbers.map((d: any) => (<SelectItem key={d} value={String(d)}>Fecha {d}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Select value={matchStatusFilter} onValueChange={setMatchStatusFilter}>
+                    <SelectTrigger className="w-[130px] h-8 text-xs"><SelectValue placeholder="Estado" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas las jornadas</SelectItem>
-                      {dayNumbers.map((d: any) => (
-                        <SelectItem key={d} value={String(d)}>Jornada {d}</SelectItem>
-                      ))}
+                      <SelectItem value="all">Todos</SelectItem>
+                      {Object.entries(statusLabels).map(([k, v]) => (<SelectItem key={k} value={k}>{v.label}</SelectItem>))}
                     </SelectContent>
                   </Select>
-                )}
-                {canManage && (
-                  <>
-                    {tournament.teams?.length >= 2 && (
-                      <Dialog open={fixtureDialogOpen} onOpenChange={setFixtureDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            <Calendar className="h-4 w-4 mr-2" />Generar Fixture
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Generar Fixture</DialogTitle>
-                            <DialogDescription>
-                              Configura las opciones para generar el fixture automaticamente.
-                              Tipo: {typeLabels[tournament.type] || tournament.type} | {tournament.teams?.length || 0} equipos
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            {(tournament.type === "LEAGUE" || tournament.type === "GROUPS") && (
-                              <div className="space-y-2">
-                                <Label>Modalidad</Label>
-                                <Select value={fixtureConfig.legs} onValueChange={(v) => setFixtureConfig(prev => ({ ...prev, legs: v }))}>
-                                  <SelectTrigger><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="1">Solo ida</SelectItem>
-                                    <SelectItem value="2">Ida y vuelta</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                            <div className="space-y-2">
-                              <Label>Fecha de inicio</Label>
-                              <Input
-                                type="date"
-                                value={fixtureConfig.startDate}
-                                onChange={(e) => setFixtureConfig(prev => ({ ...prev, startDate: e.target.value }))}
-                                placeholder="Usa la fecha del torneo si no se especifica"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label>Dias entre jornadas</Label>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  max={30}
-                                  value={fixtureConfig.intervalDays}
-                                  onChange={(e) => setFixtureConfig(prev => ({ ...prev, intervalDays: e.target.value }))}
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Hora de partidos</Label>
-                                <Input
-                                  type="time"
-                                  value={fixtureConfig.matchTime}
-                                  onChange={(e) => setFixtureConfig(prev => ({ ...prev, matchTime: e.target.value }))}
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Sede por defecto (opcional)</Label>
-                              <Input
-                                value={fixtureConfig.defaultVenue}
-                                onChange={(e) => setFixtureConfig(prev => ({ ...prev, defaultVenue: e.target.value }))}
-                                placeholder="Ej: Cancha Municipal"
-                              />
-                            </div>
-                            <Button onClick={handleGenerateFixture} disabled={fixtureLoading} className="w-full">
-                              {fixtureLoading ? "Generando..." : "Generar Fixture"}
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                    {tournament.matches?.length > 0 && (
-                      <Button size="sm" variant="destructive" onClick={() => setDeleteFixtureOpen(true)}>
-                        <Trash2 className="h-4 w-4 mr-2" />Eliminar Fixture
-                      </Button>
-                    )}
-                    <Button size="sm" asChild>
-                      <Link href={`/dashboard/matches/new`}><Plus className="h-4 w-4 mr-2" />Manual</Link>
+                  {(matchSearch || filterDay !== "all" || matchStatusFilter !== "all") && (
+                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setMatchSearch(""); setFilterDay("all"); setMatchStatusFilter("all"); }}>
+                      <X className="h-3 w-3 mr-1" />Limpiar
                     </Button>
-                  </>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {filteredMatches.length === 0 ? (
-                <p className="text-muted-foreground text-sm text-center py-6">No hay partidos programados.</p>
-              ) : (
-                <div className="space-y-2">
-                  {filteredMatches.map((m: any) => {
-                    const teamA = tournament.teams?.find((tt: any) => tt.teamId === m.teamAId)?.team;
-                    const teamB = tournament.teams?.find((tt: any) => tt.teamId === m.teamBId)?.team;
-                    return (
-                      <Link key={m.id} href={`/dashboard/matches/detalle?id=${m.id}`}>
-                        <div className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer">
-                          <div className="flex items-center gap-3">
-                            <div className="text-xs text-muted-foreground min-w-[60px]">
-                              {m.dayNumber ? `J${m.dayNumber}` : ""}<br />
-                              {new Date(m.scheduledAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
-                            </div>
-                            <span className="font-medium">{teamA?.name || m.teamAId}</span>
-                            <span className="text-primary font-bold">
-                              {m.status === "SCHEDULED" ? "vs" : `${m.scoreA ?? 0} - ${m.scoreB ?? 0}`}
-                            </span>
-                            <span className="font-medium">{teamB?.name || m.teamBId}</span>
-                          </div>
-                          <Badge variant="outline" className={
-                            m.status === "FINISHED" ? "bg-gray-100 text-gray-800" :
-                            m.status === "IN_PROGRESS" ? "bg-green-100 text-green-800" :
-                            "bg-blue-100 text-blue-800"
-                          }>
-                            {statusLabels[m.status]?.label || m.status}
-                          </Badge>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                  )}
+                  <div className="flex gap-1 ml-auto">
+                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setCollapsedDays(new Set())}>Expandir</Button>
+                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setCollapsedDays(new Set(groupedMatchesByDay.map(([k]) => k)))}>Colapsar</Button>
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Grouped matches */}
+          {filteredMatches.length === 0 ? (
+            <Card><CardContent className="p-8 text-center"><p className="text-muted-foreground text-sm">No hay partidos que coincidan.</p></CardContent></Card>
+          ) : (
+            <div className="space-y-2">
+              {groupedMatchesByDay.map(([dayKey, group]) => {
+                const isCollapsed = collapsedDays.has(dayKey);
+                const dayFinished = group.matches.every((m: any) => m.status === "FINISHED" || m.status === "CANCELLED");
+                const dayInProgress = group.matches.some((m: any) => m.status === "IN_PROGRESS" || m.status === "HALFTIME");
+                return (
+                  <div key={dayKey}>
+                    <button onClick={() => toggleMatchDay(dayKey)} className="w-full flex items-center gap-2 p-2.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors mb-1">
+                      {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+                      <span className="font-semibold text-sm">{group.label}</span>
+                      <div className="flex items-center gap-2 ml-auto">
+                        <span className="text-xs text-muted-foreground">{group.matches.length} partido(s)</span>
+                        {dayInProgress && <Badge className="text-xs bg-green-100 text-green-800">En juego</Badge>}
+                        {dayFinished && !dayInProgress && <Badge variant="secondary" className="text-xs">Completada</Badge>}
+                      </div>
+                    </button>
+                    {!isCollapsed && (
+                      <div className="space-y-1.5 ml-2 border-l-2 border-muted pl-3 mb-2">
+                        {group.matches.map((m: any) => {
+                          const teamA = tournament.teams?.find((tt: any) => tt.teamId === m.teamAId)?.team;
+                          const teamB = tournament.teams?.find((tt: any) => tt.teamId === m.teamBId)?.team;
+                          return (
+                            <Link key={m.id} href={`/dashboard/matches/detalle?id=${m.id}`}>
+                              <div className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-muted/50 cursor-pointer">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <div className="text-xs text-muted-foreground min-w-[45px]">
+                                    {new Date(m.scheduledAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
+                                  </div>
+                                  <span className="font-medium text-sm truncate flex-1 text-right">{teamA?.name || m.teamAId}</span>
+                                  <span className="text-primary font-bold text-sm min-w-[45px] text-center">
+                                    {m.status === "SCHEDULED" ? "vs" : `${m.scoreA ?? 0} - ${m.scoreB ?? 0}`}
+                                  </span>
+                                  <span className="font-medium text-sm truncate flex-1">{teamB?.name || m.teamBId}</span>
+                                </div>
+                                <Badge variant="outline" className={`text-xs ml-2 ${
+                                  m.status === "FINISHED" ? "bg-gray-100 text-gray-800" :
+                                  m.status === "IN_PROGRESS" ? "bg-green-100 text-green-800" :
+                                  "bg-blue-100 text-blue-800"
+                                }`}>
+                                  {statusLabels[m.status]?.label || m.status}
+                                </Badge>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         {/* Rounds tab */}
