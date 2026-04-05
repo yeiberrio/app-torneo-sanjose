@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,8 +31,9 @@ export default function MatchesPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Collapsed state per day
+  // Collapsed state per day - track which are collapsed (closed)
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
+  const lastInitRef = useRef<string>("");
 
   useEffect(() => {
     api.get("/tournaments?limit=100").then((res) => {
@@ -48,49 +49,6 @@ export default function MatchesPage() {
     }).catch(() => {}).finally(() => setLoading(false));
   }, [selectedTournament]);
 
-  // Determine which days should be auto-expanded
-  const getCurrentAndNextDay = (matchList: any[]): Set<string> => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const daysWithMatches = new Map<number, Date>();
-    matchList.forEach(m => {
-      if (m.dayNumber) {
-        const d = new Date(m.scheduledAt);
-        if (!daysWithMatches.has(m.dayNumber) || d < daysWithMatches.get(m.dayNumber)!) {
-          daysWithMatches.set(m.dayNumber, d);
-        }
-      }
-    });
-
-    // Find current day (has unfinished matches or is closest to today)
-    let currentDay: number | null = null;
-    let nextDay: number | null = null;
-    const sortedDays = Array.from(daysWithMatches.entries()).sort((a, b) => a[0] - b[0]);
-
-    for (const [dayNum, date] of sortedDays) {
-      const dayMatches = matchList.filter(m => m.dayNumber === dayNum);
-      const hasUnfinished = dayMatches.some(m => m.status !== "FINISHED" && m.status !== "CANCELLED");
-      if (hasUnfinished) {
-        if (!currentDay) currentDay = dayNum;
-        else if (!nextDay) { nextDay = dayNum; break; }
-      }
-    }
-
-    // If no unfinished found, show last two days
-    if (!currentDay && sortedDays.length > 0) {
-      currentDay = sortedDays[sortedDays.length - 1][0];
-      if (sortedDays.length > 1) nextDay = sortedDays[sortedDays.length - 2][0];
-    }
-
-    const expanded = new Set<string>();
-    if (currentDay) expanded.add(String(currentDay));
-    if (nextDay) expanded.add(String(nextDay));
-    // Also expand "no day" matches
-    expanded.add("sin-fecha");
-    return expanded;
-  };
-
   // Filter matches
   const filteredMatches = useMemo(() => {
     let result = matches;
@@ -99,7 +57,8 @@ export default function MatchesPage() {
       result = result.filter(m =>
         (m.teamA?.name || "").toLowerCase().includes(q) ||
         (m.teamB?.name || "").toLowerCase().includes(q) ||
-        (m.venue || "").toLowerCase().includes(q)
+        (m.venue || "").toLowerCase().includes(q) ||
+        (m.tournament?.name || "").toLowerCase().includes(q)
       );
     }
     if (filterStatus !== "all") {
@@ -108,7 +67,7 @@ export default function MatchesPage() {
     return result;
   }, [matches, searchText, filterStatus]);
 
-  // Group matches by dayNumber
+  // Group matches by dayNumber - ALWAYS, regardless of tournament selection
   const groupedMatches = useMemo(() => {
     const groups = new Map<string, { label: string; matches: any[]; sortKey: number }>();
 
@@ -124,24 +83,59 @@ export default function MatchesPage() {
       groups.get(key)!.matches.push(m);
     });
 
-    // Sort matches within each group by scheduledAt
     groups.forEach(g => g.matches.sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()));
 
     return Array.from(groups.entries()).sort((a, b) => a[1].sortKey - b[1].sortKey);
   }, [filteredMatches]);
 
-  // Auto-expand current and next day on first load
+  // Auto-expand current and next day - re-init when matches change
   useEffect(() => {
-    if (matches.length > 0 && collapsedDays.size === 0) {
-      const expanded = getCurrentAndNextDay(matches);
-      const allDays = new Set(matches.map(m => m.dayNumber ? String(m.dayNumber) : "sin-fecha"));
-      const collapsed = new Set<string>();
-      allDays.forEach(d => {
-        if (!expanded.has(d)) collapsed.add(d);
-      });
-      setCollapsedDays(collapsed);
+    if (matches.length === 0) return;
+    // Use a key to detect changes
+    const initKey = `${selectedTournament}-${matches.length}`;
+    if (lastInitRef.current === initKey) return;
+    lastInitRef.current = initKey;
+
+    // Find which days to expand: current (first with unfinished) + next
+    const dayMap = new Map<number, boolean>();
+    matches.forEach(m => {
+      if (!m.dayNumber) return;
+      const hasUnfinished = m.status !== "FINISHED" && m.status !== "CANCELLED";
+      if (hasUnfinished) dayMap.set(m.dayNumber, true);
+      else if (!dayMap.has(m.dayNumber)) dayMap.set(m.dayNumber, false);
+    });
+
+    const sortedDayNums = Array.from(dayMap.keys()).sort((a, b) => a - b);
+    const expanded = new Set<string>();
+    expanded.add("sin-fecha");
+
+    let foundCurrent = false;
+    for (const d of sortedDayNums) {
+      if (dayMap.get(d)) {
+        expanded.add(String(d));
+        if (!foundCurrent) {
+          foundCurrent = true;
+        } else {
+          // Found the next one too, stop
+          break;
+        }
+      }
     }
-  }, [matches]);
+
+    // If nothing unfinished, expand last two
+    if (!foundCurrent && sortedDayNums.length > 0) {
+      expanded.add(String(sortedDayNums[sortedDayNums.length - 1]));
+      if (sortedDayNums.length > 1) expanded.add(String(sortedDayNums[sortedDayNums.length - 2]));
+    }
+
+    // Collapse everything NOT in expanded
+    const allDays = new Set(matches.map(m => m.dayNumber ? String(m.dayNumber) : "sin-fecha"));
+    const collapsed = new Set<string>();
+    allDays.forEach(d => {
+      if (!expanded.has(d)) collapsed.add(d);
+    });
+    setCollapsedDays(collapsed);
+  }, [matches, selectedTournament]);
 
   const toggleDay = (dayKey: string) => {
     setCollapsedDays(prev => {
@@ -154,18 +148,12 @@ export default function MatchesPage() {
 
   const expandAll = () => setCollapsedDays(new Set());
   const collapseAll = () => {
-    const all = new Set(groupedMatches.map(([key]) => key));
-    setCollapsedDays(all);
+    setCollapsedDays(new Set(groupedMatches.map(([key]) => key)));
   };
 
   const hasActiveFilters = searchText.trim() !== "" || filterStatus !== "all";
+  const clearFilters = () => { setSearchText(""); setFilterStatus("all"); };
 
-  const clearFilters = () => {
-    setSearchText("");
-    setFilterStatus("all");
-  };
-
-  // Stats for the header
   const totalMatches = filteredMatches.length;
   const finishedCount = filteredMatches.filter(m => m.status === "FINISHED").length;
   const inProgressCount = filteredMatches.filter(m => m.status === "IN_PROGRESS" || m.status === "HALFTIME").length;
@@ -196,7 +184,7 @@ export default function MatchesPage() {
       </div>
 
       {/* Stats bar */}
-      {selectedTournament !== "all" && !loading && totalMatches > 0 && (
+      {!loading && totalMatches > 0 && (
         <div className="flex gap-4 mb-4 text-sm text-muted-foreground">
           <span>{totalMatches} partidos</span>
           <span>{finishedCount} finalizados</span>
@@ -213,7 +201,7 @@ export default function MatchesPage() {
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar equipo o sede..."
+                  placeholder="Buscar equipo, sede o torneo..."
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
                   className="pl-9"
@@ -258,8 +246,7 @@ export default function MatchesPage() {
             )}
           </CardContent>
         </Card>
-      ) : selectedTournament !== "all" && groupedMatches.length > 0 ? (
-        // Grouped by day view
+      ) : (
         <div className="space-y-3">
           {groupedMatches.map(([dayKey, group]) => {
             const isCollapsed = collapsedDays.has(dayKey);
@@ -309,7 +296,12 @@ export default function MatchesPage() {
                                     <span className="font-medium text-sm text-left flex-1 truncate">{m.teamB?.name || m.teamBId}</span>
                                   </div>
                                 </div>
-                                <Badge variant="outline" className={`${status.className} text-xs ml-2`}>{status.label}</Badge>
+                                <div className="ml-2 flex flex-col items-end gap-1">
+                                  <Badge variant="outline" className={`${status.className} text-xs`}>{status.label}</Badge>
+                                  {selectedTournament === "all" && m.tournament && (
+                                    <span className="text-xs text-muted-foreground truncate max-w-[120px]">{m.tournament.name}</span>
+                                  )}
+                                </div>
                               </div>
                               {m.venue && <p className="text-xs text-muted-foreground mt-1 text-center">{m.venue}</p>}
                             </CardContent>
@@ -320,46 +312,6 @@ export default function MatchesPage() {
                   </div>
                 )}
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        // Flat list when no tournament selected
-        <div className="space-y-2">
-          {filteredMatches.map((m) => {
-            const status = statusLabels[m.status] || { label: m.status, className: "bg-gray-100 text-gray-800" };
-            return (
-              <Link key={m.id} href={`/dashboard/matches/detalle?id=${m.id}`}>
-                <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="text-center min-w-[70px]">
-                          <p className="text-xs text-muted-foreground">{m.dayNumber ? `Fecha ${m.dayNumber}` : ""}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(m.scheduledAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" })}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(m.scheduledAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3 flex-1 justify-center">
-                          <span className="font-semibold text-right flex-1 truncate">{m.teamA?.name || m.teamAId}</span>
-                          <div className="text-xl font-bold text-primary min-w-[60px] text-center">
-                            {m.status === "SCHEDULED" ? "vs" : `${m.scoreA ?? 0} - ${m.scoreB ?? 0}`}
-                          </div>
-                          <span className="font-semibold text-left flex-1 truncate">{m.teamB?.name || m.teamBId}</span>
-                        </div>
-                      </div>
-                      <div className="ml-4 flex flex-col items-end gap-1">
-                        <Badge variant="outline" className={status.className}>{status.label}</Badge>
-                        {m.tournament && <span className="text-xs text-muted-foreground">{m.tournament.name}</span>}
-                      </div>
-                    </div>
-                    {m.venue && <p className="text-xs text-muted-foreground mt-2 text-center">{m.venue}</p>}
-                  </CardContent>
-                </Card>
-              </Link>
             );
           })}
         </div>
