@@ -1,6 +1,37 @@
-import { IsString, IsOptional, IsEnum, IsInt, Min, IsArray, Max } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsInt, Min, IsArray, Max, ValidateNested, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TournamentType } from '@prisma/client';
+
+export class PhaseTemplateDto {
+  @ApiPropertyOptional({ example: 'Fase de grupos' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiProperty({ enum: ['ROUND_ROBIN', 'GROUP_STAGE', 'KNOCKOUT', 'POINTS_CLASSIFICATION'] })
+  @IsIn(['ROUND_ROBIN', 'GROUP_STAGE', 'KNOCKOUT', 'POINTS_CLASSIFICATION'])
+  type: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2)
+  legs?: number;
+
+  @ApiPropertyOptional({ example: 2 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  teamsAdvancing?: number;
+
+  @ApiPropertyOptional({ example: 4 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  groupsCount?: number;
+}
 
 export class CreateTournamentDto {
   @ApiProperty({ example: 'Torneo San Jose 2026' })
@@ -75,4 +106,11 @@ export class CreateTournamentDto {
   @Min(10)
   @Max(240)
   matchDurationMin?: number;
+
+  @ApiPropertyOptional({ type: [PhaseTemplateDto], description: 'Fases a crear junto con el torneo' })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PhaseTemplateDto)
+  phases?: PhaseTemplateDto[];
 }

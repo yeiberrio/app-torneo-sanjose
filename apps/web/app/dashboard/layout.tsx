@@ -51,7 +51,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile top bar */}
-      <header className="lg:hidden fixed top-0 inset-x-0 h-14 bg-[#0d1f3c] text-white z-40 flex items-center px-3 gap-2 pt-[env(safe-area-inset-top)]">
+      <header className="lg:hidden fixed top-0 inset-x-0 h-[calc(3.5rem+env(safe-area-inset-top))] bg-[#0d1f3c] text-white z-40 flex items-center px-3 gap-2 pt-[env(safe-area-inset-top)]">
         <Button variant="ghost" size="icon" className="text-white hover:bg-white/10" onClick={() => setSidebarOpen(true)} aria-label="Abrir menú">
           <Menu className="h-5 w-5" />
         </Button>
@@ -73,7 +73,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {sidebarOpen && <div className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fade-in" onClick={() => setSidebarOpen(false)} />}
 
       {/* Sidebar */}
-      <aside className={cn("fixed top-0 left-0 h-full w-72 lg:w-64 bg-[#0d1f3c] text-white z-50 flex flex-col transform transition-transform duration-200 lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
+      <aside className={cn("fixed top-0 left-0 h-full pt-[env(safe-area-inset-top)] lg:pt-0 w-72 lg:w-64 bg-[#0d1f3c] text-white z-50 flex flex-col transform transition-transform duration-200 lg:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
         <div className="p-5 border-b border-white/10 flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20"><Trophy className="h-5 w-5 text-white" /></div>
           <div className="flex-1 min-w-0">
@@ -116,7 +116,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main */}
-      <main className="lg:ml-64 pt-14 lg:pt-0 min-h-screen pb-20 lg:pb-0">
+      <main className="lg:ml-64 pt-[calc(3.5rem+env(safe-area-inset-top))] lg:pt-0 min-h-screen pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto animate-fade-in">{children}</div>
       </main>
 

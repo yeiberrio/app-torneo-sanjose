@@ -181,7 +181,7 @@ export function FixtureTab({ tournament, canManage, refresh, trashedCount, onTra
 
       {/* Barra de seleccion */}
       {selectMode && (
-        <div className="sticky top-14 lg:top-0 z-20 rounded-xl border bg-card/95 backdrop-blur px-3 py-2 flex flex-wrap items-center gap-2 shadow-sm">
+        <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] lg:top-0 z-20 rounded-xl border bg-card/95 backdrop-blur px-3 py-2 flex flex-wrap items-center gap-2 shadow-sm">
           <span className="text-sm font-medium">{selected.size} seleccionados</span>
           <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={selectAllVisible}>Seleccionar visibles ({filtered.length})</Button>
           <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setSelected(new Set())}>Ninguno</Button>

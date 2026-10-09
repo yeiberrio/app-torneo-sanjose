@@ -37,8 +37,27 @@ export class TournamentsService {
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateTournamentDto, organizerId: string) {
+    const { phases, venues, ...rest } = dto;
     return this.prisma.tournament.create({
-      data: { ...dto, organizerId, startDate: new Date(dto.startDate), endDate: dto.endDate ? new Date(dto.endDate) : undefined },
+      data: {
+        ...rest,
+        organizerId,
+        venues: (venues || []).map(v => String(v).trim()).filter(Boolean),
+        startDate: new Date(dto.startDate),
+        endDate: dto.endDate ? new Date(dto.endDate) : undefined,
+        rounds: phases && phases.length > 0 ? {
+          create: phases.map((p, i) => ({
+            roundNumber: i + 1,
+            name: p.name || undefined,
+            type: p.type as any,
+            legs: p.legs || 1,
+            teamsAdvancing: p.teamsAdvancing,
+            groupsCount: p.groupsCount,
+            isActive: i === 0,
+          })),
+        } : undefined,
+      },
+      include: { rounds: { orderBy: { roundNumber: 'asc' } } },
     });
   }
 
@@ -232,8 +251,9 @@ export class TournamentsService {
         qualified.push(...rows.slice(0, perGroup).map(r => ({ ...r, seed: 0 })));
         if (rows[perGroup]) thirds.push(rows[perGroup]);
       }
-      // Ordenar clasificados: primeros de grupo por puntos, luego segundos...
-      qualified.sort((a, b) => (a.position! - b.position!) || (b.points - a.points) || (b.goalDifference - a.goalDifference) || (b.goalsFor - a.goalsFor));
+      // Orden: primeros de cada grupo (A1, B1, C1...), luego segundos (A2, B2...).
+      // Con emparejamiento sembrado (1 vs ultimo) esto produce cruces entre grupos: A1-B2, B1-A2 / A1-D2, B1-C2...
+      qualified.sort((a, b) => (a.position! - b.position!) || (a.groupName || '').localeCompare(b.groupName || ''));
       thirds.sort((a, b) => (b.points - a.points) || (b.goalDifference - a.goalDifference) || (b.goalsFor - a.goalsFor));
     } else {
       qualified = overall.slice(0, perGroup).map(r => ({ ...r, seed: 0 }));

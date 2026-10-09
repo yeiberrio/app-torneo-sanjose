@@ -88,10 +88,10 @@ export function splitFullName(full: string): { firstName: string; lastName: stri
 }
 
 export const POSITION_ALIASES: Record<string, string> = {
-  portero: 'GOALKEEPER', arquero: 'GOALKEEPER', goalkeeper: 'GOALKEEPER', gk: 'GOALKEEPER', por: 'GOALKEEPER',
-  defensa: 'DEFENDER', defensor: 'DEFENDER', defender: 'DEFENDER', def: 'DEFENDER',
-  mediocampista: 'MIDFIELDER', medio: 'MIDFIELDER', volante: 'MIDFIELDER', midfielder: 'MIDFIELDER', med: 'MIDFIELDER', mc: 'MIDFIELDER',
-  delantero: 'FORWARD', atacante: 'FORWARD', forward: 'FORWARD', del: 'FORWARD', dc: 'FORWARD',
+  portero: 'GOALKEEPER', arquero: 'GOALKEEPER', guardameta: 'GOALKEEPER', goalkeeper: 'GOALKEEPER', gk: 'GOALKEEPER', por: 'GOALKEEPER',
+  defensa: 'DEFENDER', defensor: 'DEFENDER', defender: 'DEFENDER', def: 'DEFENDER', lateral: 'DEFENDER', central: 'DEFENDER', zaguero: 'DEFENDER', libero: 'DEFENDER', 'defensa central': 'DEFENDER', 'lateral derecho': 'DEFENDER', 'lateral izquierdo': 'DEFENDER',
+  mediocampista: 'MIDFIELDER', medio: 'MIDFIELDER', volante: 'MIDFIELDER', midfielder: 'MIDFIELDER', med: 'MIDFIELDER', mc: 'MIDFIELDER', mediocentro: 'MIDFIELDER', 'volante de marca': 'MIDFIELDER', 'volante mixto': 'MIDFIELDER', 'volante creativo': 'MIDFIELDER', enganche: 'MIDFIELDER', centrocampista: 'MIDFIELDER',
+  delantero: 'FORWARD', atacante: 'FORWARD', forward: 'FORWARD', del: 'FORWARD', dc: 'FORWARD', extremo: 'FORWARD', punta: 'FORWARD', puntero: 'FORWARD', ariete: 'FORWARD', 'centro delantero': 'FORWARD', centrodelantero: 'FORWARD',
 };
 
 export const DOCUMENT_ALIASES: Record<string, string> = {

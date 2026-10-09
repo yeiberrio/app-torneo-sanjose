@@ -207,7 +207,7 @@ export class PlayersService {
           [''],
           ['1. Una fila por jugador en la hoja "Jugadores". Borre las filas de ejemplo.'],
           ['2. Obligatorios: Equipo, Nombre y Apellido. El equipo debe existir (vea la hoja "Equipos") o active "Crear equipos faltantes" al importar.'],
-          ['3. Posición: Portero, Defensa, Mediocampista o Delantero.'],
+          ['3. Posición: Portero, Defensa, Mediocampista o Delantero (también acepta Arquero, Lateral, Central, Volante, Extremo, Punta...).'],
           ['4. Tipo documento: CC, CE, TI, Pasaporte o NIT. Documento: solo el número.'],
           ['5. Fecha nacimiento en formato AAAA-MM-DD (ej. 1998-05-20) o DD/MM/AAAA. Género: M o F.'],
           ['6. Un jugador se considera duplicado si en el mismo equipo ya existe otro con el mismo documento o el mismo nombre y apellido; esas filas se omiten.'],
