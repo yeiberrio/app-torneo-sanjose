@@ -481,6 +481,28 @@ export default function MatchDetailPage() {
                   weekday: "long", day: "2-digit", month: "long", year: "numeric",
                 })}
               </p>
+              {(match.label || match.groupName || match.round) && (
+                <p className="text-xs font-medium text-foreground/70 mt-1">
+                  {[match.round?.name, match.label, match.groupName ? `Grupo ${match.groupName}` : null, match.legNumber > 1 ? "Vuelta" : null].filter(Boolean).join(" · ")}
+                </p>
+              )}
+              {match.winnerTeamId && (
+                <Badge variant="outline" className="mt-2 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  Ganador: {match.winnerTeamId === match.teamAId ? teamAName : teamBName}{(match.scoreA ?? 0) === (match.scoreB ?? 0) ? " (penales)" : ""}
+                </Badge>
+              )}
+              {canManageMatch && match.status === "FINISHED" && match.round?.type === "KNOCKOUT" && (match.scoreA ?? 0) === (match.scoreB ?? 0) && (
+                <div className="mt-3 rounded-lg border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 p-2">
+                  <p className="text-[11px] text-amber-800 dark:text-amber-200 mb-1.5">Empate en eliminatoria: define el ganador por penales</p>
+                  <div className="flex gap-1.5 justify-center flex-wrap">
+                    {[{ id: match.teamAId, name: teamAName }, { id: match.teamBId, name: teamBName }].map(t => (
+                      <Button key={t.id} size="sm" variant={match.winnerTeamId === t.id ? "default" : "outline"} className="h-7 text-xs" onClick={async () => { try { await api.patch(`/matches/${matchId}`, { winnerTeamId: match.winnerTeamId === t.id ? null : t.id }); toast.success("Ganador actualizado"); fetchMatch(); } catch { toast.error("Error al guardar"); } }}>
+                        {t.name}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="text-center flex-1">

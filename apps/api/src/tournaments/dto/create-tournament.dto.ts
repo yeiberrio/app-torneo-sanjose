@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsInt, Min, IsArray, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TournamentType } from '@prisma/client';
 
@@ -53,4 +53,26 @@ export class CreateTournamentDto {
   @IsInt()
   @Min(1)
   maxYellowCards?: number;
+
+  @ApiPropertyOptional({ example: 'Torneo de fútbol 7 categoría libre' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ example: 'Guarne' })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiPropertyOptional({ example: ['Cancha San José', 'Cancha La Clara'] })
+  @IsOptional()
+  @IsArray()
+  venues?: string[];
+
+  @ApiPropertyOptional({ example: 60 })
+  @IsOptional()
+  @IsInt()
+  @Min(10)
+  @Max(240)
+  matchDurationMin?: number;
 }

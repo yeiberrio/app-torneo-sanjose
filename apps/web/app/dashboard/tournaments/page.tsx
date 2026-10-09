@@ -1,219 +1,110 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/form-field";
+import { PageHeader } from "@/components/ui/page-header";
+import { FilterBar } from "@/components/ui/filter-bar";
+import { EmptyState } from "@/components/ui/empty-state";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { ListSkeleton } from "@/components/ui/skeleton";
+import { tournamentStatus, tournamentType } from "@/lib/labels";
+import { fmtDate } from "@/lib/format";
+import { Plus, Trash2, Trophy, Users, Swords, CalendarDays, ChevronRight, MapPin } from "lucide-react";
 import api from "@/lib/api";
-import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { can } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
+
+const ALL = "all";
 
 export default function TournamentsPage() {
   const { user } = useAuthStore();
-  const [tournaments, setTournaments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const canCreate = user ? can(user.role, "create", "Tournament") : false;
   const canDelete = user ? can(user.role, "delete", "Tournament") : false;
-
-  // Delete dialog state
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [fStatus, setFStatus] = useState(ALL);
+  const [fType, setFType] = useState(ALL);
   const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const [password, setPassword] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const loadTournaments = () => {
-    setLoading(true);
-    api
-      .get("/tournaments")
-      .then((res) => setTournaments(res.data.data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
+  const load = () => { setLoading(true); api.get("/tournaments?limit=100").then((res) => setTournaments(res.data.data || [])).catch(() => {}).finally(() => setLoading(false)); };
+  useEffect(() => { load(); }, []);
 
-  useEffect(() => {
-    loadTournaments();
-  }, []);
+  const filtered = useMemo(() => tournaments.filter(t => {
+    if (fStatus !== ALL && t.status !== fStatus) return false;
+    if (fType !== ALL && t.type !== fType) return false;
+    if (search.trim() && !t.name.toLowerCase().includes(search.toLowerCase()) && !(t.city || "").toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  }).sort((a, b) => { const order: Record<string, number> = { IN_PROGRESS: 0, PUBLISHED: 1, DRAFT: 2, FINISHED: 3, CANCELLED: 4 }; return (order[a.status] ?? 9) - (order[b.status] ?? 9) || new Date(b.startDate).getTime() - new Date(a.startDate).getTime(); }), [tournaments, fStatus, fType, search]);
 
   const handleDelete = async () => {
     if (!deleteTarget || !password) return;
-    setDeleting(true);
-    setDeleteError("");
-    try {
-      await api.delete(`/tournaments/${deleteTarget.id}`, {
-        data: { password },
-      });
-      setDeleteTarget(null);
-      setPassword("");
-      loadTournaments();
-    } catch (err: any) {
-      const msg =
-        err.response?.data?.message || "Error al eliminar el torneo";
-      setDeleteError(msg);
-    } finally {
-      setDeleting(false);
-    }
+    setDeleting(true); setDeleteError("");
+    try { await api.delete(`/tournaments/${deleteTarget.id}`, { data: { password } }); setDeleteTarget(null); setPassword(""); load(); }
+    catch (err: any) { setDeleteError(err.response?.data?.message || "Error al eliminar"); } finally { setDeleting(false); }
   };
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Torneos</h1>
-        <div className="flex gap-2">
-          {canDelete && (
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/tournaments/papelera">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Papelera
-              </Link>
-            </Button>
-          )}
-          {canCreate && (
-            <Button asChild>
-              <Link href="/dashboard/tournaments/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Torneo
-              </Link>
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader title="Torneos" subtitle={`${tournaments.length} torneos`} actions={
+        <>
+          {canDelete && <Button variant="ghost" size="sm" className="rounded-xl" asChild><Link href="/dashboard/tournaments/papelera"><Trash2 className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Papelera</span></Link></Button>}
+          {canCreate && <Button size="sm" className="rounded-xl" asChild><Link href="/dashboard/tournaments/new"><Plus className="h-4 w-4 mr-1.5" />Nuevo torneo</Link></Button>}
+        </>
+      } />
+      <FilterBar search={search} onSearch={setSearch} placeholder="Buscar torneo..." activeCount={[fStatus, fType].filter(v => v !== ALL).length} onClear={() => { setFStatus(ALL); setFType(ALL); setSearch(""); }}>
+        <Select value={fStatus} onValueChange={setFStatus}><SelectTrigger className="h-9 w-[150px] text-xs rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todo estado</SelectItem>{Object.entries(tournamentStatus).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}</SelectContent></Select>
+        <Select value={fType} onValueChange={setFType}><SelectTrigger className="h-9 w-[170px] text-xs rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todo formato</SelectItem>{Object.entries(tournamentType).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent></Select>
+      </FilterBar>
 
-      {loading ? (
-        <p className="text-muted-foreground">Cargando...</p>
-      ) : tournaments.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-muted-foreground">
-              No hay torneos creados aun.
-            </p>
-            {canCreate && (
-              <Button className="mt-4" asChild>
-                <Link href="/dashboard/tournaments/new">
-                  Crear primer torneo
-                </Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+      {loading ? <ListSkeleton rows={3} /> : tournaments.length === 0 ? (
+        <EmptyState icon={<Trophy className="h-6 w-6" />} title="Aún no hay torneos" description="Crea tu primer torneo, inscribe equipos y genera el calendario en minutos." action={canCreate && <Button size="sm" asChild><Link href="/dashboard/tournaments/new"><Plus className="h-4 w-4 mr-1.5" />Crear torneo</Link></Button>} />
+      ) : filtered.length === 0 ? (
+        <EmptyState compact title="Sin resultados" description="Ningún torneo coincide con los filtros." />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {tournaments.map((t) => (
-            <Card
-              key={t.id}
-              className="card-hover relative group"
-            >
-              <Link href={`/dashboard/tournaments/detalle?id=${t.id}`}>
-                <CardHeader>
-                  <CardTitle className="text-lg">{t.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>{t.type}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs ${
-                        t.status === "IN_PROGRESS"
-                          ? "bg-green-100 text-green-800"
-                          : t.status === "FINISHED"
-                          ? "bg-gray-100 text-gray-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
-                      {t.status}
-                    </span>
+        <div className="grid gap-3 md:grid-cols-2">
+          {filtered.map((t) => {
+            const st = tournamentStatus[t.status] || { label: t.status, tone: "neutral" as const };
+            return (
+              <div key={t.id} className={cn("relative rounded-2xl border bg-card p-4 transition-all hover:shadow-md hover:border-primary/30", t.status === "IN_PROGRESS" && "border-emerald-300/60 dark:border-emerald-800")}>
+                <Link href={`/dashboard/tournaments/detalle?id=${t.id}`} className="block">
+                  <div className="flex items-start gap-3">
+                    <div className="h-11 w-11 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center shrink-0">{t.logoUrl ? <img src={t.logoUrl} alt="" className="h-11 w-11 rounded-xl object-cover" /> : <Trophy className="h-5 w-5" />}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate pr-6">{t.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 flex-wrap"><span>{tournamentType[t.type] || t.type}</span>{t.city && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{t.city}</span>}</p>
+                    </div>
+                    <StatusBadge label={st.label} tone={st.tone} size="xs" />
                   </div>
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    {t._count?.teams || 0} equipos |{" "}
-                    {t._count?.matches || 0} partidos
+                  <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" />{t._count?.teams ?? 0} equipos</span>
+                    <span className="inline-flex items-center gap-1"><Swords className="h-3.5 w-3.5" />{t._count?.matches ?? 0} partidos</span>
+                    <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" />{fmtDate(t.startDate, { day: "2-digit", month: "short", year: "numeric" })}</span>
+                    <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground/50" />
                   </div>
-                </CardContent>
-              </Link>
-              {canDelete && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDeleteTarget(t);
-                    setDeleteError("");
-                    setPassword("");
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </Card>
-          ))}
+                </Link>
+                {canDelete && <Button size="icon" variant="ghost" className="absolute top-2 right-2 h-7 w-7 text-muted-foreground/60 hover:text-rose-600" onClick={() => { setDeleteTarget(t); setPassword(""); setDeleteError(""); }}><Trash2 className="h-3.5 w-3.5" /></Button>}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Delete confirmation dialog */}
-      <Dialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeleteTarget(null);
-            setPassword("");
-            setDeleteError("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Eliminar torneo</DialogTitle>
-            <DialogDescription>
-              El torneo <strong>{deleteTarget?.name}</strong> sera movido a la
-              papelera. Podras restaurarlo despues si lo necesitas.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="delete-password">
-                Ingresa tu contraseña para confirmar
-              </Label>
-              <Input
-                id="delete-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Contraseña"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleDelete();
-                }}
-              />
-            </div>
-            {deleteError && (
-              <p className="text-sm text-destructive">{deleteError}</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteTarget(null)}
-              disabled={deleting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting || !password}
-            >
-              {deleting ? "Eliminando..." : "Eliminar"}
-            </Button>
-          </DialogFooter>
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setPassword(""); setDeleteError(""); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Eliminar torneo</DialogTitle><DialogDescription>Para mover <strong>{deleteTarget?.name}</strong> a la papelera confirma tu contraseña.</DialogDescription></DialogHeader>
+          <Field label="Contraseña" required><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleDelete()} autoFocus /></Field>
+          {deleteError && <p className="text-xs text-rose-600">{deleteError}</p>}
+          <DialogFooter><Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancelar</Button><Button variant="destructive" onClick={handleDelete} disabled={!password || deleting}>{deleting ? "Eliminando..." : "Eliminar"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

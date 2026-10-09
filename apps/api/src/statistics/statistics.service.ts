@@ -1,21 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { computeStandings, groupStandings, DEFAULT_TIEBREAKERS, StandingRow } from '../common/standings.util';
 
-export interface StandingRow {
-  teamId: string;
-  teamName: string;
-  logoUrl: string | null;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  goalDifference: number;
-  points: number;
-  yellowCards: number;
-  redCards: number;
-}
+export { StandingRow };
 
 export interface TopScorer {
   playerId: string;
@@ -32,145 +19,40 @@ export interface TopScorer {
 export class StatisticsService {
   constructor(private prisma: PrismaService) {}
 
-  async getStandings(tournamentId: string): Promise<StandingRow[]> {
+  async getStandings(tournamentId: string, roundId?: string): Promise<StandingRow[]> {
     const tournament = await this.prisma.tournament.findUnique({
       where: { id: tournamentId },
       select: { winPoints: true, drawPoints: true, lossPoints: true },
     });
-
     if (!tournament) return [];
 
-    const { winPoints, drawPoints, lossPoints } = tournament;
-
-    // Get all teams in this tournament
     const tournamentTeams = await this.prisma.tournamentTeam.findMany({
       where: { tournamentId },
       include: { team: { select: { id: true, name: true, logoUrl: true } } },
     });
-
-    // Get all finished matches
+    const where: any = { tournamentId, deletedAt: null };
+    if (roundId) where.roundId = roundId;
     const matches = await this.prisma.match.findMany({
-      where: { tournamentId, status: 'FINISHED' },
-      select: { teamAId: true, teamBId: true, scoreA: true, scoreB: true },
-    });
-
-    const standingsMap = new Map<string, StandingRow>();
-
-    for (const tt of tournamentTeams) {
-      standingsMap.set(tt.team.id, {
-        teamId: tt.team.id,
-        teamName: tt.team.name,
-        logoUrl: tt.team.logoUrl,
-        played: 0,
-        won: 0,
-        drawn: 0,
-        lost: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        goalDifference: 0,
-        points: 0,
-        yellowCards: 0,
-        redCards: 0,
-      });
-    }
-
-    for (const match of matches) {
-      const a = standingsMap.get(match.teamAId);
-      const b = standingsMap.get(match.teamBId);
-      const scoreA = match.scoreA ?? 0;
-      const scoreB = match.scoreB ?? 0;
-
-      if (a) {
-        a.played++;
-        a.goalsFor += scoreA;
-        a.goalsAgainst += scoreB;
-        if (scoreA > scoreB) { a.won++; a.points += winPoints; }
-        else if (scoreA === scoreB) { a.drawn++; a.points += drawPoints; }
-        else { a.lost++; a.points += lossPoints; }
-      }
-
-      if (b) {
-        b.played++;
-        b.goalsFor += scoreB;
-        b.goalsAgainst += scoreA;
-        if (scoreB > scoreA) { b.won++; b.points += winPoints; }
-        else if (scoreB === scoreA) { b.drawn++; b.points += drawPoints; }
-        else { b.lost++; b.points += lossPoints; }
-      }
-    }
-
-    // Count cards for fair play tiebreaker
-    const cardEvents = await this.prisma.matchEvent.findMany({
-      where: {
-        match: { tournamentId, status: 'FINISHED' },
-        type: { in: ['YELLOW_CARD', 'RED_CARD', 'YELLOW_RED_CARD'] },
+      where,
+      select: {
+        teamAId: true, teamBId: true, scoreA: true, scoreB: true, status: true, scheduledAt: true,
+        events: { where: { type: { in: ['YELLOW_CARD', 'RED_CARD', 'YELLOW_RED_CARD'] } }, select: { teamId: true, type: true } },
       },
-      select: { teamId: true, type: true },
     });
+    const tiebreakers = await this.prisma.tournamentTiebreaker.findMany({ where: { tournamentId, roundId: roundId || null }, orderBy: { priority: 'asc' } });
+    const order = tiebreakers.length > 0 ? tiebreakers.map(t => t.criteria as string) : DEFAULT_TIEBREAKERS;
+    return computeStandings(
+      tournamentTeams.map(tt => ({ id: tt.team.id, name: tt.team.name, logoUrl: tt.team.logoUrl, groupName: tt.groupName })),
+      matches.map(m => ({ ...m, cards: m.events })),
+      tournament,
+      order,
+    );
+  }
 
-    for (const event of cardEvents) {
-      const team = standingsMap.get(event.teamId);
-      if (team) {
-        if (event.type === 'YELLOW_CARD') team.yellowCards++;
-        else if (event.type === 'RED_CARD') team.redCards++;
-        else if (event.type === 'YELLOW_RED_CARD') { team.yellowCards++; team.redCards++; }
-      }
-    }
-
-    const standings = Array.from(standingsMap.values());
-    for (const s of standings) {
-      s.goalDifference = s.goalsFor - s.goalsAgainst;
-    }
-
-    // Load tiebreaker configuration
-    const tiebreakers = await this.prisma.tournamentTiebreaker.findMany({
-      where: { tournamentId, roundId: null },
-      orderBy: { priority: 'asc' },
-    });
-
-    // If no custom tiebreakers configured, use default FIFA order
-    const tiebreakerOrder = tiebreakers.length > 0
-      ? tiebreakers.map(t => t.criteria)
-      : ['GOAL_DIFFERENCE', 'GOALS_FOR', 'HEAD_TO_HEAD', 'FAIR_PLAY'];
-
-    // Sort function
-    standings.sort((a, b) => {
-      // Points always first
-      if (b.points !== a.points) return b.points - a.points;
-
-      // Apply tiebreakers in order
-      for (const criteria of tiebreakerOrder) {
-        let diff = 0;
-        switch (criteria) {
-          case 'GOAL_DIFFERENCE':
-            diff = b.goalDifference - a.goalDifference;
-            break;
-          case 'GOALS_FOR':
-            diff = b.goalsFor - a.goalsFor;
-            break;
-          case 'GOALS_AGAINST':
-            diff = a.goalsAgainst - b.goalsAgainst; // Less goals against is better
-            break;
-          case 'WINS':
-            diff = b.won - a.won;
-            break;
-          case 'DRAWS':
-            diff = b.drawn - a.drawn;
-            break;
-          case 'FAIR_PLAY':
-            diff = (a.yellowCards || 0) - (b.yellowCards || 0); // Less cards is better
-            break;
-          case 'HEAD_TO_HEAD':
-            // Would need specific match data - skip for now, handled by existing GD/GF
-            break;
-        }
-        if (diff !== 0) return diff;
-      }
-
-      return a.teamName.localeCompare(b.teamName);
-    });
-
-    return standings;
+  async getGroupedStandings(tournamentId: string, roundId?: string) {
+    const rows = await this.getStandings(tournamentId, roundId);
+    const hasGroups = rows.some(r => r.groupName);
+    return { hasGroups, overall: rows, groups: hasGroups ? groupStandings(rows) : { General: rows } };
   }
 
   async getTopScorers(tournamentId: string, limit = 20): Promise<TopScorer[]> {
@@ -297,8 +179,8 @@ export class StatisticsService {
 
   async getTournamentSummary(tournamentId: string) {
     const [totalMatches, finishedMatches, totalTeams, totalPlayers] = await Promise.all([
-      this.prisma.match.count({ where: { tournamentId } }),
-      this.prisma.match.count({ where: { tournamentId, status: 'FINISHED' } }),
+      this.prisma.match.count({ where: { tournamentId, deletedAt: null } }),
+      this.prisma.match.count({ where: { tournamentId, deletedAt: null, status: 'FINISHED' } }),
       this.prisma.tournamentTeam.count({ where: { tournamentId } }),
       this.prisma.player.count({
         where: { team: { tournaments: { some: { tournamentId } } } },
@@ -307,7 +189,7 @@ export class StatisticsService {
 
     // Total goals
     const finishedMatchesData = await this.prisma.match.findMany({
-      where: { tournamentId, status: 'FINISHED' },
+      where: { tournamentId, deletedAt: null, status: 'FINISHED' },
       select: { scoreA: true, scoreB: true },
     });
 

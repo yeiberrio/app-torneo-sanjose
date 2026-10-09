@@ -11,6 +11,7 @@ import { Trophy, Target, AlertTriangle, BarChart3, TrendingUp, Shield, Search, X
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import api from "@/lib/api";
 import Link from "next/link";
+import { StandingsTable } from "@/components/tournament/standings-table";
 
 interface Tournament { id: string; name: string; status: string; }
 interface Standing { teamId: string; teamName: string; logoUrl: string | null; played: number; won: number; drawn: number; lost: number; goalsFor: number; goalsAgainst: number; goalDifference: number; points: number; yellowCards: number; redCards: number; }
@@ -157,45 +158,14 @@ export default function StatisticsPage() {
                 <CardContent>
                   {filteredStandings.length === 0 ? (
                     <p className="text-muted-foreground text-sm text-center py-4">Sin datos.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b text-muted-foreground">
-                            <th className="text-left py-2 px-2">#</th>
-                            <th className="text-left py-2 px-2">Equipo</th>
-                            <th className="text-center py-2 px-1">PJ</th>
-                            <th className="text-center py-2 px-1">PG</th>
-                            <th className="text-center py-2 px-1">PE</th>
-                            <th className="text-center py-2 px-1">PP</th>
-                            <th className="text-center py-2 px-1">GF</th>
-                            <th className="text-center py-2 px-1">GC</th>
-                            <th className="text-center py-2 px-1">DG</th>
-                            <th className="text-center py-2 px-2 font-bold">PTS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredStandings.map((row, i) => (
-                            <tr key={row.teamId} className={`border-b hover:bg-muted/50 ${i < 4 ? "bg-green-50/50" : ""}`}>
-                              <td className="py-2 px-2 font-medium">{standings.indexOf(row) + 1}</td>
-                              <td className="py-2 px-2 font-medium">
-                                <Link href={`/dashboard/teams/detalle?id=${row.teamId}`} className="hover:text-primary hover:underline">{row.teamName}</Link>
-                              </td>
-                              <td className="text-center py-2 px-1">{row.played}</td>
-                              <td className="text-center py-2 px-1">{row.won}</td>
-                              <td className="text-center py-2 px-1">{row.drawn}</td>
-                              <td className="text-center py-2 px-1">{row.lost}</td>
-                              <td className="text-center py-2 px-1">{row.goalsFor}</td>
-                              <td className="text-center py-2 px-1">{row.goalsAgainst}</td>
-                              <td className="text-center py-2 px-1">
-                                <span className={row.goalDifference > 0 ? "text-green-600" : row.goalDifference < 0 ? "text-red-600" : ""}>{row.goalDifference > 0 ? "+" : ""}{row.goalDifference}</span>
-                              </td>
-                              <td className="text-center py-2 px-2 font-bold text-primary">{row.points}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  ) : filteredStandings.some((r: any) => r.groupName) && !standingsSearch.trim() ? (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {Object.entries(filteredStandings.reduce((acc: Record<string, any[]>, r: any) => { (acc[r.groupName || "General"] ||= []).push(r); return acc; }, {})).sort(([a], [b]) => a.localeCompare(b)).map(([g, rows]) => (
+                        <StandingsTable key={g} title={`Grupo ${g}`} rows={(rows as any[]).map((r, i) => ({ ...r, position: i + 1 }))} />
+                      ))}
                     </div>
+                  ) : (
+                    <StandingsTable rows={filteredStandings.map((r: any) => ({ ...r, position: standings.indexOf(r) + 1 }))} />
                   )}
                 </CardContent>
               </Card>

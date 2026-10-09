@@ -14,21 +14,38 @@ export class MatchesService {
   ) {}
 
   async create(dto: CreateMatchDto) {
+    if (dto.teamAId === dto.teamBId) throw new BadRequestException('Los equipos deben ser diferentes');
+    const { groupName, ...rest } = dto as any;
     return this.prisma.match.create({
-      data: { ...dto, scheduledAt: new Date(dto.scheduledAt) },
+      data: { ...rest, groupName: groupName ? String(groupName).toUpperCase() : undefined, scheduledAt: new Date(dto.scheduledAt) },
     });
   }
 
-  async findAll(tournamentId?: string, page = 1, limit = 20) {
+  async findAll(
+    tournamentId?: string, page = 1, limit = 20,
+    filters: { teamId?: string; status?: string; roundId?: string; groupName?: string; dayNumber?: number; from?: string; to?: string; venue?: string; search?: string } = {},
+  ) {
     const skip = (page - 1) * limit;
     const where: any = { deletedAt: null };
     if (tournamentId) where.tournamentId = tournamentId;
+    if (filters.teamId) where.OR = [{ teamAId: filters.teamId }, { teamBId: filters.teamId }];
+    if (filters.status) where.status = filters.status.includes(',') ? { in: filters.status.split(',') } : filters.status;
+    if (filters.roundId) where.roundId = filters.roundId;
+    if (filters.groupName) where.groupName = filters.groupName;
+    if (filters.dayNumber) where.dayNumber = filters.dayNumber;
+    if (filters.venue) where.venue = { contains: filters.venue, mode: 'insensitive' };
+    if (filters.from || filters.to) {
+      where.scheduledAt = {};
+      if (filters.from) where.scheduledAt.gte = new Date(filters.from);
+      if (filters.to) { const t = new Date(filters.to); t.setHours(23, 59, 59, 999); where.scheduledAt.lte = t; }
+    }
     const [matches, total] = await Promise.all([
       this.prisma.match.findMany({
         where, skip, take: limit,
-        orderBy: { scheduledAt: 'asc' },
+        orderBy: [{ scheduledAt: 'asc' }, { matchNumber: 'asc' }],
         include: {
           tournament: { select: { id: true, name: true } },
+          round: { select: { id: true, name: true, type: true, roundNumber: true } },
         },
       }),
       this.prisma.match.count({ where }),
@@ -42,11 +59,15 @@ export class MatchesService {
     });
     const teamMap = new Map(teams.map((t) => [t.id, t]));
 
-    const data = matches.map((m) => ({
+    let data = matches.map((m) => ({
       ...m,
       teamA: teamMap.get(m.teamAId) || { id: m.teamAId, name: m.teamAId, logoUrl: null },
       teamB: teamMap.get(m.teamBId) || { id: m.teamBId, name: m.teamBId, logoUrl: null },
     }));
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      data = data.filter(m => m.teamA.name.toLowerCase().includes(q) || m.teamB.name.toLowerCase().includes(q) || (m.venue || '').toLowerCase().includes(q) || (m.label || '').toLowerCase().includes(q));
+    }
 
     return { data, total, page, limit };
   }
@@ -55,7 +76,8 @@ export class MatchesService {
     const match = await this.prisma.match.findUnique({
       where: { id },
       include: {
-        tournament: { select: { id: true, name: true, logoUrl: true } },
+        tournament: { select: { id: true, name: true, logoUrl: true, matchDurationMin: true, venues: true } },
+        round: { select: { id: true, name: true, type: true, roundNumber: true, legs: true } },
         events: { orderBy: { minute: 'asc' }, include: { player: { select: { id: true, firstName: true, lastName: true, jerseyNumber: true } } } },
         playerStats: { include: { player: { select: { id: true, firstName: true, lastName: true, jerseyNumber: true, teamId: true } } } },
         referee: { select: { id: true, firstName: true, lastName: true } },
@@ -65,7 +87,7 @@ export class MatchesService {
     return match;
   }
 
-  async update(id: string, dto: Partial<CreateMatchDto> & { scoreA?: number; scoreB?: number; refereeReport?: string }) {
+  async update(id: string, dto: Partial<CreateMatchDto> & { scoreA?: number; scoreB?: number; refereeReport?: string; roundId?: string | null; groupName?: string | null; label?: string | null; legNumber?: number; winnerTeamId?: string | null; phaseNumber?: number | null }) {
     const match = await this.prisma.match.findUnique({ where: { id } });
     if (!match) throw new NotFoundException('Partido no encontrado');
 
@@ -82,6 +104,13 @@ export class MatchesService {
     if (dto.scoreA !== undefined) data.scoreA = dto.scoreA;
     if (dto.scoreB !== undefined) data.scoreB = dto.scoreB;
     if (dto.refereeReport !== undefined) data.refereeReport = dto.refereeReport;
+    if (dto.roundId !== undefined) data.roundId = dto.roundId || null;
+    if (dto.groupName !== undefined) data.groupName = dto.groupName ? String(dto.groupName).toUpperCase() : null;
+    if (dto.label !== undefined) data.label = dto.label || null;
+    if (dto.legNumber !== undefined) data.legNumber = dto.legNumber;
+    if (dto.phaseNumber !== undefined) data.phaseNumber = dto.phaseNumber;
+    if (dto.winnerTeamId !== undefined) data.winnerTeamId = dto.winnerTeamId || null;
+    if ((data.teamAId || match.teamAId) === (data.teamBId || match.teamBId)) throw new BadRequestException('Los equipos deben ser diferentes');
 
     return this.prisma.match.update({ where: { id }, data });
   }

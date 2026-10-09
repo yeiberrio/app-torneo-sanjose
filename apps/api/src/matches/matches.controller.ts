@@ -18,8 +18,19 @@ export class MatchesController {
     @Query('tournamentId') tournamentId?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('teamId') teamId?: string,
+    @Query('status') status?: string,
+    @Query('roundId') roundId?: string,
+    @Query('groupName') groupName?: string,
+    @Query('dayNumber') dayNumber?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('venue') venue?: string,
+    @Query('search') search?: string,
   ) {
-    return this.matchesService.findAll(tournamentId, Number(page) || 1, Number(limit) || 20);
+    return this.matchesService.findAll(tournamentId, Number(page) || 1, Number(limit) || 20, {
+      teamId, status, roundId, groupName, dayNumber: dayNumber ? Number(dayNumber) : undefined, from, to, venue, search,
+    });
   }
 
   @Get(':id')
@@ -42,7 +53,7 @@ export class MatchesController {
   @UseGuards(JwtAuthGuard, PoliciesGuard)
   @CheckPolicies({ action: 'update', subject: 'Match' })
   @ApiOperation({ summary: 'Actualizar partido' })
-  update(@Param('id') id: string, @Body() dto: Partial<CreateMatchDto>) {
+  update(@Param('id') id: string, @Body() dto: any) {
     return this.matchesService.update(id, dto);
   }
 

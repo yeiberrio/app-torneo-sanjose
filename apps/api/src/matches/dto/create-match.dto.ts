@@ -49,4 +49,25 @@ export class CreateMatchDto {
   @IsOptional()
   @IsString()
   observerId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  roundId?: string;
+
+  @ApiPropertyOptional({ example: 'A' })
+  @IsOptional()
+  @IsString()
+  groupName?: string;
+
+  @ApiPropertyOptional({ example: 'Cuartos de final 1' })
+  @IsOptional()
+  @IsString()
+  label?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  legNumber?: number;
 }

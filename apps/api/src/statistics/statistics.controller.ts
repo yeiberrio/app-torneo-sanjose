@@ -9,8 +9,14 @@ export class StatisticsController {
 
   @Get(':tournamentId/standings')
   @ApiOperation({ summary: 'Tabla de posiciones del torneo' })
-  getStandings(@Param('tournamentId') tournamentId: string) {
-    return this.statisticsService.getStandings(tournamentId);
+  getStandings(@Param('tournamentId') tournamentId: string, @Query('roundId') roundId?: string) {
+    return this.statisticsService.getStandings(tournamentId, roundId || undefined);
+  }
+
+  @Get(':tournamentId/standings/grouped')
+  @ApiOperation({ summary: 'Tabla de posiciones agrupada por grupo' })
+  getGroupedStandings(@Param('tournamentId') tournamentId: string, @Query('roundId') roundId?: string) {
+    return this.statisticsService.getGroupedStandings(tournamentId, roundId || undefined);
   }
 
   @Get(':tournamentId/top-scorers')

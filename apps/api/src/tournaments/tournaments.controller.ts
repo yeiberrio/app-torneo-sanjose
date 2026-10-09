@@ -6,6 +6,7 @@ import { UpdateTournamentDto } from './dto/update-tournament.dto';
 import { GenerateFixtureDto } from './dto/generate-fixture.dto';
 import { CreateRoundDto } from './dto/create-round.dto';
 import { ConfigureTiebreakersDto } from './dto/configure-tiebreakers.dto';
+import { BulkUpdateMatchesDto, DistributeGroupsDto, NextPhaseDto, SetGroupDto } from './dto/fixture-ops.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PoliciesGuard, CheckPolicies } from '../casl/policies.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -37,9 +38,90 @@ export class TournamentsController {
   }
 
   @Get(':id/standings')
-  @ApiOperation({ summary: 'Tabla de posiciones' })
-  getStandings(@Param('id') id: string) {
-    return this.tournamentsService.getStandings(id);
+  @ApiOperation({ summary: 'Tabla de posiciones (opcional por ronda y grupo)' })
+  getStandings(@Param('id') id: string, @Query('roundId') roundId?: string, @Query('group') group?: string) {
+    return this.tournamentsService.getStandings(id, roundId || undefined, group || undefined);
+  }
+
+  @Get(':id/standings/grouped')
+  @ApiOperation({ summary: 'Tabla de posiciones agrupada por grupo' })
+  getGroupedStandings(@Param('id') id: string, @Query('roundId') roundId?: string) {
+    return this.tournamentsService.getGroupedStandings(id, roundId || undefined);
+  }
+
+  @Get(':id/rounds/:roundId/standings')
+  @ApiOperation({ summary: 'Posiciones de una ronda agrupadas' })
+  getRoundStandings(@Param('id') id: string, @Param('roundId') roundId: string) {
+    return this.tournamentsService.getGroupedStandings(id, roundId);
+  }
+
+  @Get(':id/rounds/:roundId/qualified')
+  @ApiOperation({ summary: 'Equipos clasificados de una ronda' })
+  getQualified(@Param('id') id: string, @Param('roundId') roundId: string) {
+    return this.tournamentsService.getQualified(id, roundId);
+  }
+
+  @Post(':id/rounds/:roundId/next-phase')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Generar la siguiente fase de una ronda eliminatoria' })
+  nextPhase(@Param('id') id: string, @Param('roundId') roundId: string, @Body() dto: NextPhaseDto) {
+    return this.tournamentsService.generateNextPhase(id, roundId, dto);
+  }
+
+  @Patch(':id/fixture/bulk')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Match' })
+  @ApiOperation({ summary: 'Editar varios partidos del fixture a la vez' })
+  bulkUpdate(@Param('id') id: string, @Body() dto: BulkUpdateMatchesDto) {
+    return this.tournamentsService.bulkUpdateMatches(id, dto);
+  }
+
+  @Post(':id/fixture/renumber')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Match' })
+  @ApiOperation({ summary: 'Renumerar jornadas y partidos por fecha' })
+  renumber(@Param('id') id: string, @Query('roundId') roundId?: string) {
+    return this.tournamentsService.renumberFixture(id, roundId || undefined);
+  }
+
+  @Post(':id/matches/:matchId/swap')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Match' })
+  @ApiOperation({ summary: 'Invertir local y visitante' })
+  swap(@Param('id') id: string, @Param('matchId') matchId: string) {
+    return this.tournamentsService.swapMatchTeams(id, matchId);
+  }
+
+  @Post(':id/groups/distribute')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Distribuir equipos en grupos automaticamente' })
+  distributeGroups(@Param('id') id: string, @Body() dto: DistributeGroupsDto) {
+    return this.tournamentsService.distributeGroups(id, dto);
+  }
+
+  @Patch(':id/teams/:teamId/group')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Asignar grupo a un equipo' })
+  setGroup(@Param('id') id: string, @Param('teamId') teamId: string, @Body() dto: SetGroupDto) {
+    return this.tournamentsService.setTeamGroup(id, teamId, dto.groupName);
+  }
+
+  @Post(':id/teams/bulk')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, PoliciesGuard)
+  @CheckPolicies({ action: 'update', subject: 'Tournament' })
+  @ApiOperation({ summary: 'Inscribir varios equipos' })
+  addTeams(@Param('id') id: string, @Body('teamIds') teamIds: string[], @Body('groupName') groupName?: string) {
+    return this.tournamentsService.addTeams(id, teamIds || [], groupName);
   }
 
   @Get(':id/export-excel')

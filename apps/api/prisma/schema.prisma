@@ -287,6 +287,10 @@ model Tournament {
   drawPoints       Int              @default(1)
   lossPoints       Int              @default(0)
   maxYellowCards   Int              @default(3)
+  description      String?
+  city             String?
+  venues           String[]         @default([])
+  matchDurationMin Int              @default(60)
   deletedAt        DateTime?
   deletedBy        String?
   createdAt        DateTime         @default(now())
@@ -382,6 +386,11 @@ model Match {
   refereeReport  String?
   roundId        String?
   round          TournamentRound? @relation(fields: [roundId], references: [id])
+  groupName      String?
+  legNumber      Int         @default(1)
+  label          String?
+  phaseNumber    Int?
+  winnerTeamId   String?
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
   deletedAt      DateTime?
@@ -390,6 +399,8 @@ model Match {
   events         MatchEvent[]
   playerStats    MatchPlayerStat[]
 
+  @@index([tournamentId, roundId])
+  @@index([tournamentId, dayNumber])
   @@map("matches")
 }
 
@@ -475,6 +486,9 @@ model TournamentRound {
   legs            Int       @default(1)
   isActive        Boolean   @default(false)
   isCompleted     Boolean   @default(false)
+  startDate       DateTime?
+  groupsCount     Int?
+  description     String?
   createdAt       DateTime  @default(now())
 
   matches         Match[]

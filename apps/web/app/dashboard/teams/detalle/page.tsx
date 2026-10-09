@@ -15,6 +15,7 @@ import api from "@/lib/api";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/auth-store";
 import { can } from "@/lib/permissions";
+import { ImportDialog } from "@/components/import-dialog";
 
 interface Player {
   id: string;
@@ -97,6 +98,8 @@ export default function TeamDetailPage() {
   const canEditTeam = user ? can(user.role, "update", "Team") : false;
   const canEditPlayer = user ? can(user.role, "update", "Player") : false;
   const canDeletePlayer = user ? can(user.role, "delete", "Player") : false;
+  const canCreatePlayer = user ? can(user.role, "create", "Player") : false;
+  const [importOpen, setImportOpen] = useState(false);
 
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
@@ -316,11 +319,17 @@ export default function TeamDetailPage() {
         {/* Jugadores */}
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Users className="h-5 w-5" />
                 Plantilla ({team.players.length})
               </CardTitle>
+              {canCreatePlayer && (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4 mr-1.5" />Importar</Button>
+                  <Button size="sm" asChild><Link href={`/dashboard/players/new?teamId=${team.id}`}>Nuevo</Link></Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {team.players.length === 0 ? (
@@ -523,6 +532,7 @@ export default function TeamDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ImportDialog entity="players" open={importOpen} onOpenChange={setImportOpen} teamId={team.id} onImported={fetchTeam} />
     </div>
   );
 }

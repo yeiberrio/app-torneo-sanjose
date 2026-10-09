@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 210 20% 96%;
+    --background: 210 20% 97%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -20,16 +20,16 @@
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 214.3 25% 90%;
+    --input: 214.3 25% 88%;
     --ring: 142.1 76.2% 36.3%;
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 7%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 222 40% 10%;
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
@@ -43,8 +43,8 @@
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 217 28% 18%;
+    --input: 217 28% 20%;
     --ring: 142.4 71.8% 29.2%;
   }
 }
@@ -160,3 +160,15 @@ html {
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.4);
 }
+
+/* Tablas compactas */
+.table-soft th { @apply text-[11px] uppercase tracking-wide text-muted-foreground font-medium; }
+.table-soft td, .table-soft th { @apply px-2 py-2; }
+.table-soft tbody tr { @apply border-b border-border/60 last:border-0; }
+
+/* Ocultar scrollbar en carruseles horizontales */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Inputs tactiles */
+input[type="date"], input[type="time"] { min-height: 2.5rem; }

@@ -1,330 +1,177 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Swords, ChevronDown, ChevronRight, Search, Filter, X } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { FilterBar } from "@/components/ui/filter-bar";
+import { Segmented } from "@/components/ui/segmented";
+import { EmptyState } from "@/components/ui/empty-state";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { ListSkeleton } from "@/components/ui/skeleton";
+import { MatchRow } from "@/components/tournament/match-row";
+import { MatchEditDialog } from "@/components/tournament/match-edit-dialog";
+import { matchStatus } from "@/lib/labels";
+import { fmtLong } from "@/lib/format";
+import { Plus, Swords, ChevronDown, ChevronRight, Pencil, CalendarDays, Radio } from "lucide-react";
 import api from "@/lib/api";
-import Link from "next/link";
+import { useAuthStore } from "@/lib/auth-store";
+import { can } from "@/lib/permissions";
 
-const statusLabels: Record<string, { label: string; className: string }> = {
-  SCHEDULED: { label: "Programado", className: "bg-blue-100 text-blue-800" },
-  IN_PROGRESS: { label: "En juego", className: "bg-green-100 text-green-800" },
-  HALFTIME: { label: "Entretiempo", className: "bg-yellow-100 text-yellow-800" },
-  FINISHED: { label: "Finalizado", className: "bg-gray-100 text-gray-800" },
-  SUSPENDED: { label: "Suspendido", className: "bg-red-100 text-red-800" },
-  CANCELLED: { label: "Cancelado", className: "bg-red-100 text-red-800" },
-  POSTPONED: { label: "Aplazado", className: "bg-orange-100 text-orange-800" },
-};
+const ALL = "all";
+const NONE = "__none__";
 
 export default function MatchesPage() {
+  const { user } = useAuthStore();
+  const canManage = user ? can(user.role, "update", "Match") : false;
   const [matches, setMatches] = useState<any[]>([]);
   const [tournaments, setTournaments] = useState<any[]>([]);
-  const [selectedTournament, setSelectedTournament] = useState<string>("all");
+  const [tournament, setTournament] = useState<any>(null);
+  const [selectedTournament, setSelectedTournament] = useState<string>(ALL);
   const [loading, setLoading] = useState(true);
-
-  // Filters
-  const [searchText, setSearchText] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [showFilters, setShowFilters] = useState(false);
-
-  // Collapsed state per day - track which are collapsed (closed)
-  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
-  const lastInitRef = useRef<string>("");
+  const [search, setSearch] = useState("");
+  const [fStatus, setFStatus] = useState(ALL);
+  const [fTeam, setFTeam] = useState(ALL);
+  const [fRound, setFRound] = useState(ALL);
+  const [fGroup, setFGroup] = useState(ALL);
+  const [fVenue, setFVenue] = useState(ALL);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [quick, setQuick] = useState<"all" | "today" | "week" | "live" | "pending" | "played">("all");
+  const [groupBy, setGroupBy] = useState<"day" | "date" | "none">("day");
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const lastInit = useRef("");
+  const [editMatch, setEditMatch] = useState<any>(null);
 
   useEffect(() => {
     api.get("/tournaments?limit=100").then((res) => {
-      setTournaments(res.data.data || []);
+      const list = res.data.data || []; setTournaments(list);
+      const active = list.find((t: any) => t.status === "IN_PROGRESS");
+      if (active) setSelectedTournament(active.id);
     }).catch(() => {});
   }, []);
 
-  useEffect(() => {
+  const load = () => {
     setLoading(true);
-    const params = selectedTournament !== "all" ? `?tournamentId=${selectedTournament}&limit=500` : "?limit=500";
-    api.get(`/matches${params}`).then((res) => {
-      setMatches(res.data.data || []);
-    }).catch(() => {}).finally(() => setLoading(false));
-  }, [selectedTournament]);
+    const params = selectedTournament !== ALL ? `?tournamentId=${selectedTournament}&limit=1000` : "?limit=1000";
+    api.get(`/matches${params}`).then((res) => setMatches(res.data.data || [])).catch(() => {}).finally(() => setLoading(false));
+    if (selectedTournament !== ALL) api.get(`/tournaments/${selectedTournament}`).then(r => setTournament(r.data)).catch(() => setTournament(null));
+    else setTournament(null);
+  };
+  useEffect(() => { load(); }, [selectedTournament]);
 
-  // Filter matches
-  const filteredMatches = useMemo(() => {
-    let result = matches;
-    if (searchText.trim()) {
-      const q = searchText.toLowerCase();
-      result = result.filter(m =>
-        (m.teamA?.name || "").toLowerCase().includes(q) ||
-        (m.teamB?.name || "").toLowerCase().includes(q) ||
-        (m.venue || "").toLowerCase().includes(q) ||
-        (m.tournament?.name || "").toLowerCase().includes(q)
-      );
-    }
-    if (filterStatus !== "all") {
-      result = result.filter(m => m.status === filterStatus);
-    }
-    return result;
-  }, [matches, searchText, filterStatus]);
+  const teams = useMemo(() => { const m = new Map<string, any>(); matches.forEach(x => { if (x.teamA) m.set(x.teamAId, x.teamA); if (x.teamB) m.set(x.teamBId, x.teamB); }); return Array.from(m.values()).sort((a, b) => a.name.localeCompare(b.name)); }, [matches]);
+  const rounds = useMemo(() => { const m = new Map<string, any>(); matches.forEach(x => { if (x.round) m.set(x.round.id, x.round); }); return Array.from(m.values()).sort((a, b) => a.roundNumber - b.roundNumber); }, [matches]);
+  const groups = useMemo(() => Array.from(new Set(matches.map(m => m.groupName).filter(Boolean))).sort() as string[], [matches]);
+  const venues = useMemo(() => Array.from(new Set(matches.map(m => m.venue).filter(Boolean))).sort() as string[], [matches]);
 
-  // Group matches by dayNumber, using scheduledAt as date reference
-  const groupedMatches = useMemo(() => {
-    const groups = new Map<string, { label: string; matches: any[]; sortKey: number; avgDate: number }>();
-
-    filteredMatches.forEach(m => {
-      const key = m.dayNumber ? String(m.dayNumber) : "sin-fecha";
-      if (!groups.has(key)) {
-        // Build a label with the date range of this day
-        const dateStr = m.scheduledAt
-          ? new Date(m.scheduledAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })
-          : "";
-        groups.set(key, {
-          label: m.dayNumber ? `Fecha ${m.dayNumber}` : "Sin fecha asignada",
-          matches: [],
-          sortKey: m.dayNumber || 9999,
-          avgDate: 0,
-        });
-      }
-      groups.get(key)!.matches.push(m);
+  const filtered = useMemo(() => {
+    const now = new Date(); const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime(); const endToday = startToday + 86400000; const endWeek = startToday + 7 * 86400000;
+    return matches.filter(m => {
+      const t = new Date(m.scheduledAt).getTime();
+      if (quick === "today" && (t < startToday || t >= endToday)) return false;
+      if (quick === "week" && (t < startToday || t >= endWeek)) return false;
+      if (quick === "live" && !["IN_PROGRESS", "HALFTIME"].includes(m.status)) return false;
+      if (quick === "pending" && !["SCHEDULED", "POSTPONED"].includes(m.status)) return false;
+      if (quick === "played" && m.status !== "FINISHED") return false;
+      if (fStatus !== ALL && m.status !== fStatus) return false;
+      if (fTeam !== ALL && m.teamAId !== fTeam && m.teamBId !== fTeam) return false;
+      if (fRound !== ALL && (m.roundId || NONE) !== fRound) return false;
+      if (fGroup !== ALL && (m.groupName || NONE) !== fGroup) return false;
+      if (fVenue !== ALL && (m.venue || NONE) !== fVenue) return false;
+      if (from && t < new Date(from + "T00:00:00").getTime()) return false;
+      if (to && t > new Date(to + "T23:59:59").getTime()) return false;
+      if (search.trim()) { const q = search.toLowerCase(); if (![m.teamA?.name, m.teamB?.name, m.venue, m.tournament?.name, m.label].some(s => (s || "").toLowerCase().includes(q))) return false; }
+      return true;
     });
+  }, [matches, quick, fStatus, fTeam, fRound, fGroup, fVenue, from, to, search]);
 
-    // Calculate average date per group for sorting and proximity detection
-    groups.forEach(g => {
-      const dates = g.matches.map((m: any) => new Date(m.scheduledAt).getTime());
-      g.avgDate = dates.reduce((a: number, b: number) => a + b, 0) / dates.length;
-      g.matches.sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
-      // Add date to label
-      if (g.matches.length > 0 && g.matches[0].dayNumber) {
-        const first = new Date(g.matches[0].scheduledAt);
-        g.label = `Fecha ${g.matches[0].dayNumber} - ${first.toLocaleDateString("es-CO", { day: "2-digit", month: "long" })}`;
-      }
+  const grouped = useMemo(() => {
+    const map = new Map<string, { label: string; sort: number; matches: any[]; sub?: string }>();
+    filtered.forEach(m => {
+      let key = "all", label = "Partidos", sort = 0, sub: string | undefined;
+      if (groupBy === "day") { key = m.dayNumber ? `${m.tournamentId}-${m.dayNumber}` : "none"; label = m.dayNumber ? `Fecha ${m.dayNumber}` : "Sin jornada"; sort = m.dayNumber || 9999; sub = fmtLong(m.scheduledAt); }
+      else if (groupBy === "date") { const d = new Date(m.scheduledAt); key = d.toISOString().slice(0, 10); label = fmtLong(m.scheduledAt); sort = d.getTime(); }
+      if (!map.has(key)) map.set(key, { label, sort, matches: [], sub });
+      map.get(key)!.matches.push(m);
     });
+    map.forEach(g => g.matches.sort((a: any, b: any) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()));
+    return Array.from(map.entries()).sort((a, b) => a[1].sort - b[1].sort);
+  }, [filtered, groupBy]);
 
-    return Array.from(groups.entries()).sort((a, b) => a[1].sortKey - b[1].sortKey);
-  }, [filteredMatches]);
-
-  // Auto-expand: find the fecha closest to today based on real scheduledAt dates
   useEffect(() => {
-    if (matches.length === 0) return;
-    const initKey = `${selectedTournament}-${matches.length}`;
-    if (lastInitRef.current === initKey) return;
-    lastInitRef.current = initKey;
+    if (matches.length === 0 || groupBy === "none") return;
+    const k = `${selectedTournament}-${matches.length}-${groupBy}`;
+    if (lastInit.current === k) return; lastInit.current = k;
+    const now = Date.now(); let best: string | null = null, dist = Infinity;
+    grouped.forEach(([key, g]) => { const avg = g.matches.reduce((s: number, m: any) => s + new Date(m.scheduledAt).getTime(), 0) / g.matches.length; const d = Math.abs(avg - now); if (d < dist) { dist = d; best = key; } });
+    setCollapsed(new Set(grouped.map(([key]) => key).filter(key => key !== best)));
+  }, [matches, grouped, groupBy, selectedTournament]);
 
-    const now = Date.now();
-
-    // Build a map of dayNumber -> average date timestamp
-    const dayDates = new Map<string, number>();
-    const dayMatchMap = new Map<string, any[]>();
-    matches.forEach(m => {
-      const key = m.dayNumber ? String(m.dayNumber) : "sin-fecha";
-      if (!dayMatchMap.has(key)) dayMatchMap.set(key, []);
-      dayMatchMap.get(key)!.push(m);
-    });
-
-    dayMatchMap.forEach((ms, key) => {
-      const avg = ms.reduce((sum: number, m: any) => sum + new Date(m.scheduledAt).getTime(), 0) / ms.length;
-      dayDates.set(key, avg);
-    });
-
-    // Find the day closest to today
-    let closestKey: string | null = null;
-    let closestDist = Infinity;
-    dayDates.forEach((avgDate, key) => {
-      const dist = Math.abs(avgDate - now);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestKey = key;
-      }
-    });
-
-    // Only expand the closest day, collapse all others
-    const allKeys = Array.from(dayMatchMap.keys());
-    const collapsed = new Set<string>();
-    allKeys.forEach(k => {
-      if (k !== closestKey) collapsed.add(k);
-    });
-    setCollapsedDays(collapsed);
-  }, [matches, selectedTournament]);
-
-  const toggleDay = (dayKey: string) => {
-    setCollapsedDays(prev => {
-      const next = new Set(prev);
-      if (next.has(dayKey)) next.delete(dayKey);
-      else next.add(dayKey);
-      return next;
-    });
-  };
-
-  const expandAll = () => setCollapsedDays(new Set());
-  const collapseAll = () => {
-    setCollapsedDays(new Set(groupedMatches.map(([key]) => key)));
-  };
-
-  const hasActiveFilters = searchText.trim() !== "" || filterStatus !== "all";
-  const clearFilters = () => { setSearchText(""); setFilterStatus("all"); };
-
-  const totalMatches = filteredMatches.length;
-  const finishedCount = filteredMatches.filter(m => m.status === "FINISHED").length;
-  const inProgressCount = filteredMatches.filter(m => m.status === "IN_PROGRESS" || m.status === "HALFTIME").length;
+  const activeFilters = [fStatus, fTeam, fRound, fGroup, fVenue].filter(v => v !== ALL).length + (from ? 1 : 0) + (to ? 1 : 0);
+  const clear = () => { setFStatus(ALL); setFTeam(ALL); setFRound(ALL); setFGroup(ALL); setFVenue(ALL); setFrom(""); setTo(""); setSearch(""); setQuick("all"); };
+  const liveCount = matches.filter(m => ["IN_PROGRESS", "HALFTIME"].includes(m.status)).length;
+  const editTeams = tournament ? (tournament.teams || []).map((tt: any) => ({ id: tt.teamId, name: tt.team.name, groupName: tt.groupName })) : teams.map(t => ({ id: t.id, name: t.name }));
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-        <h1 className="text-2xl font-bold">Partidos</h1>
-        <div className="flex gap-2 items-center flex-wrap">
-          {tournaments.length > 0 && (
-            <Select value={selectedTournament} onValueChange={setSelectedTournament}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Filtrar por torneo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los torneos</SelectItem>
-                {tournaments.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Button size="sm" variant={showFilters ? "secondary" : "outline"} onClick={() => setShowFilters(!showFilters)}>
-            <Filter className="h-4 w-4 mr-1" />Filtros
-          </Button>
-          <Button asChild size="sm"><Link href="/dashboard/matches/new"><Plus className="h-4 w-4 mr-1" />Programar</Link></Button>
-        </div>
+      <PageHeader title="Partidos" subtitle={<span className="inline-flex items-center gap-2">{matches.length} partidos{liveCount > 0 && <StatusBadge label={`${liveCount} en juego`} tone="success" live size="xs" />}</span>} actions={
+        <>
+          <Select value={selectedTournament} onValueChange={setSelectedTournament}>
+            <SelectTrigger className="h-9 w-[200px] rounded-xl text-sm"><SelectValue placeholder="Torneo" /></SelectTrigger>
+            <SelectContent><SelectItem value={ALL}>Todos los torneos</SelectItem>{tournaments.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+          </Select>
+          {canManage && <Button size="sm" className="rounded-xl" asChild><Link href={`/dashboard/matches/new${selectedTournament !== ALL ? `?tournamentId=${selectedTournament}` : ""}`}><Plus className="h-4 w-4 mr-1.5" />Programar</Link></Button>}
+        </>
+      } />
+
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar mb-3 -mx-4 px-4 sm:mx-0 sm:px-0">
+        {([["all", "Todos"], ["today", "Hoy"], ["week", "Esta semana"], ["live", "En juego"], ["pending", "Pendientes"], ["played", "Jugados"]] as const).map(([k, l]) => (
+          <button key={k} onClick={() => setQuick(k)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium border transition-colors ${quick === k ? "bg-foreground text-background border-foreground" : "bg-card hover:bg-muted"}`}>{k === "live" && <Radio className="inline h-3 w-3 mr-1" />}{l}</button>
+        ))}
       </div>
 
-      {/* Stats bar */}
-      {!loading && totalMatches > 0 && (
-        <div className="flex gap-4 mb-4 text-sm text-muted-foreground">
-          <span>{totalMatches} partidos</span>
-          <span>{finishedCount} finalizados</span>
-          {inProgressCount > 0 && <span className="text-green-600 font-medium">{inProgressCount} en juego</span>}
-          <span>{groupedMatches.length} fecha(s)</span>
-        </div>
-      )}
+      <FilterBar search={search} onSearch={setSearch} placeholder="Equipo, sede, torneo o etiqueta..." activeCount={activeFilters} onClear={clear}
+        right={<Segmented value={groupBy} onChange={setGroupBy} options={[{ value: "day", label: "Jornada" }, { value: "date", label: "Día" }, { value: "none", label: "Lista" }]} />}>
+        <Select value={fStatus} onValueChange={setFStatus}><SelectTrigger className="h-9 w-[140px] text-xs rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todo estado</SelectItem>{Object.entries(matchStatus).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}</SelectContent></Select>
+        <Select value={fTeam} onValueChange={setFTeam}><SelectTrigger className="h-9 w-[160px] text-xs rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todo equipo</SelectItem>{teams.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>
+        {rounds.length > 0 && <Select value={fRound} onValueChange={setFRound}><SelectTrigger className="h-9 w-[150px] text-xs rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Toda fase</SelectItem>{rounds.map(r => <SelectItem key={r.id} value={r.id}>{r.name || `Ronda ${r.roundNumber}`}</SelectItem>)}<SelectItem value={NONE}>Sin fase</SelectItem></SelectContent></Select>}
+        {groups.length > 0 && <Select value={fGroup} onValueChange={setFGroup}><SelectTrigger className="h-9 w-[120px] text-xs rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Todo grupo</SelectItem>{groups.map(g => <SelectItem key={g} value={g}>Grupo {g}</SelectItem>)}</SelectContent></Select>}
+        {venues.length > 1 && <Select value={fVenue} onValueChange={setFVenue}><SelectTrigger className="h-9 w-[150px] text-xs rounded-xl"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={ALL}>Toda sede</SelectItem>{venues.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select>}
+        <div className="flex items-center gap-1 text-xs"><CalendarDays className="h-3.5 w-3.5 text-muted-foreground" /><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-9 w-[130px] text-xs rounded-xl" /><span className="text-muted-foreground">a</span><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-9 w-[130px] text-xs rounded-xl" /></div>
+        <span className="text-xs text-muted-foreground ml-auto hidden md:inline">{filtered.length} partidos</span>
+      </FilterBar>
 
-      {/* Filters panel */}
-      {showFilters && (
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar equipo, sede o torneo..."
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los estados</SelectItem>
-                  {Object.entries(statusLabels).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {hasActiveFilters && (
-                <Button size="sm" variant="ghost" onClick={clearFilters}>
-                  <X className="h-4 w-4 mr-1" />Limpiar
-                </Button>
-              )}
-              <div className="flex gap-1 ml-auto">
-                <Button size="sm" variant="ghost" onClick={expandAll} className="text-xs">Expandir todo</Button>
-                <Button size="sm" variant="ghost" onClick={collapseAll} className="text-xs">Colapsar todo</Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {loading ? (
-        <p className="text-muted-foreground">Cargando...</p>
-      ) : filteredMatches.length === 0 ? (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <Swords className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
-              {hasActiveFilters ? "No se encontraron partidos con los filtros aplicados." : "No hay partidos programados."}
-            </p>
-            {hasActiveFilters && (
-              <Button variant="outline" size="sm" className="mt-2" onClick={clearFilters}>Limpiar filtros</Button>
-            )}
-          </CardContent>
-        </Card>
+      {loading ? <ListSkeleton rows={6} /> : filtered.length === 0 ? (
+        <EmptyState icon={<Swords className="h-6 w-6" />} title={matches.length === 0 ? "No hay partidos programados" : "Sin resultados"} description={matches.length === 0 ? "Genera el fixture desde un torneo o programa un partido manual." : "Ningún partido coincide con los filtros."} action={matches.length === 0 ? (canManage && <Button size="sm" asChild><Link href="/dashboard/matches/new"><Plus className="h-4 w-4 mr-1.5" />Programar partido</Link></Button>) : <Button size="sm" variant="outline" onClick={clear}>Limpiar filtros</Button>} />
       ) : (
-        <div className="space-y-3">
-          {groupedMatches.map(([dayKey, group]) => {
-            const isCollapsed = collapsedDays.has(dayKey);
-            const dayFinished = group.matches.every((m: any) => m.status === "FINISHED" || m.status === "CANCELLED");
-            const dayInProgress = group.matches.some((m: any) => m.status === "IN_PROGRESS" || m.status === "HALFTIME");
-
+        <div className="space-y-2">
+          {groupBy !== "none" && grouped.length > 1 && <div className="flex justify-end gap-1"><Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setCollapsed(new Set())}>Expandir todo</Button><Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setCollapsed(new Set(grouped.map(([k]) => k)))}>Colapsar todo</Button></div>}
+          {grouped.map(([key, g]) => {
+            const c = groupBy !== "none" && collapsed.has(key);
+            const live = g.matches.some((m: any) => ["IN_PROGRESS", "HALFTIME"].includes(m.status));
+            const done = g.matches.every((m: any) => ["FINISHED", "CANCELLED"].includes(m.status));
             return (
-              <div key={dayKey}>
-                {/* Day header */}
-                <button
-                  onClick={() => toggleDay(dayKey)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors mb-1"
-                >
-                  {isCollapsed ? <ChevronRight className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
-                  <span className="font-semibold text-sm">{group.label}</span>
-                  <div className="flex items-center gap-2 ml-auto">
-                    <span className="text-xs text-muted-foreground">{group.matches.length} partido(s)</span>
-                    {dayInProgress && <Badge className="text-xs bg-green-100 text-green-800 badge-live">En juego</Badge>}
-                    {dayFinished && !dayInProgress && <Badge variant="secondary" className="text-xs">Completada</Badge>}
-                  </div>
-                </button>
-
-                {/* Day matches */}
-                {!isCollapsed && (
-                  <div className="space-y-2 ml-2 border-l-2 border-muted pl-3">
-                    {group.matches.map((m: any) => {
-                      const status = statusLabels[m.status] || { label: m.status, className: "bg-gray-100 text-gray-800" };
-                      return (
-                        <Link key={m.id} href={`/dashboard/matches/detalle?id=${m.id}`}>
-                          <Card className="card-hover cursor-pointer">
-                            <CardContent className="p-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3 flex-1">
-                                  <div className="text-center min-w-[55px]">
-                                    <p className="text-xs text-muted-foreground">
-                                      {new Date(m.scheduledAt).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {new Date(m.scheduledAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-2 flex-1 justify-center">
-                                    <span className="font-medium text-sm text-right flex-1 truncate">{m.teamA?.name || m.teamAId}</span>
-                                    <div className="text-lg font-bold text-primary min-w-[50px] text-center">
-                                      {m.status === "SCHEDULED" ? "vs" : `${m.scoreA ?? 0} - ${m.scoreB ?? 0}`}
-                                    </div>
-                                    <span className="font-medium text-sm text-left flex-1 truncate">{m.teamB?.name || m.teamBId}</span>
-                                  </div>
-                                </div>
-                                <div className="ml-2 flex flex-col items-end gap-1">
-                                  <Badge variant="outline" className={`${status.className} text-xs`}>{status.label}</Badge>
-                                  {selectedTournament === "all" && m.tournament && (
-                                    <span className="text-xs text-muted-foreground truncate max-w-[120px]">{m.tournament.name}</span>
-                                  )}
-                                </div>
-                              </div>
-                              {m.venue && <p className="text-xs text-muted-foreground mt-1 text-center">{m.venue}</p>}
-                            </CardContent>
-                          </Card>
-                        </Link>
-                      );
-                    })}
-                  </div>
+              <div key={key}>
+                {groupBy !== "none" && (
+                  <button onClick={() => setCollapsed(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors mb-1.5 text-left">
+                    {c ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                    <span className="font-semibold text-sm">{g.label}</span>
+                    {g.sub && <span className="text-xs text-muted-foreground hidden sm:inline">· {g.sub}</span>}
+                    <span className="ml-auto text-xs text-muted-foreground">{g.matches.length}</span>
+                    {live && <StatusBadge label="En juego" tone="success" live size="xs" />}{done && !live && <StatusBadge label="Completa" tone="neutral" size="xs" />}
+                  </button>
                 )}
+                {!c && <div className="space-y-1.5 mb-3">{g.matches.map((m: any) => <MatchRow key={m.id} match={m} showTournament={selectedTournament === ALL} actions={canManage && <Button size="icon" variant="ghost" className="h-7 w-7 opacity-70 sm:opacity-0 sm:group-hover:opacity-100" onClick={() => setEditMatch(m)}><Pencil className="h-3.5 w-3.5" /></Button>} />)}</div>}
               </div>
             );
           })}
         </div>
       )}
+
+      <MatchEditDialog match={editMatch} open={!!editMatch} onOpenChange={(o) => !o && setEditMatch(null)} teams={editTeams} rounds={tournament?.rounds || rounds} venues={tournament?.venues || []} onSaved={load} />
     </div>
   );
 }

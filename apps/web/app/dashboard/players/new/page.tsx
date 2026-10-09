@@ -1,23 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
+import { Suspense } from "react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import Link from "next/link";
 
-export default function NewPlayerPage() {
+function NewPlayerForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [teams, setTeams] = useState<any[]>([]);
   const [form, setForm] = useState({
-    teamId: "",
+    teamId: searchParams.get("teamId") || "",
     firstName: "",
     lastName: "",
     jerseyNumber: "",
@@ -190,4 +192,8 @@ export default function NewPlayerPage() {
       </Card>
     </div>
   );
+}
+
+export default function NewPlayerPage() {
+  return <Suspense><NewPlayerForm /></Suspense>;
 }
